@@ -1,0 +1,11 @@
+server/target/
+server/.gradle/
+server/build/
+client/node_modules/
+client/dist/
+client/build/
+client/.env
+client/.env.local
+.idea/
+*.iml
+.vscode/
