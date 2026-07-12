@@ -16,10 +16,6 @@ api.interceptors.request.use(
                 `Bearer ${token}`
         }
 
-        /*
-         * Khi body là FormData, không tự đặt
-         * Content-Type. Browser sẽ tự thêm boundary.
-         */
         if (config.data instanceof FormData) {
             delete config.headers[
                 'Content-Type'
