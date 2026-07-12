@@ -3,6 +3,7 @@ import { api } from '../../services/api'
 import type {
     Address,
     ApiResponse,
+    CreateAddressRequest,
     Order,
     OrderStatus,
     PaymentMethod,
@@ -17,7 +18,7 @@ export const getAddresses = async (): Promise<Address[]> => {
 }
 
 export const createAddress = async (
-    body: Omit<Address, 'id'>,
+    body: CreateAddressRequest,
 ): Promise<Address> => {
     const response =
         await api.post<ApiResponse<Address>>(
