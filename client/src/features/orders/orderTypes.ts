@@ -31,6 +31,17 @@ export interface Address {
     defaultAddress: boolean
 }
 
+export interface CreateAddressRequest {
+    label: string
+    recipientName: string
+    phone: string
+    province: string
+    district: string
+    ward: string
+    detailAddress: string
+    defaultAddress: boolean
+}
+
 export interface OrderItem {
     id: number
     productId: number
