@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public record ZaloPayCallbackResponse(
 
-        @JsonProperty("returncode")
+        @JsonProperty("return_code")
         Integer returnCode,
 
-        @JsonProperty("returnmessage")
+        @JsonProperty("return_message")
         String returnMessage
 
 ) {

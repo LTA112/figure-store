@@ -10,12 +10,14 @@ import com.figurestore.repository.OrderRepository;
 import com.figurestore.service.ZaloPayService;
 import com.figurestore.service.interfaces.OrderService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/payments/zalopay")
 @RequiredArgsConstructor
@@ -31,50 +33,70 @@ public class PaymentCallbackController {
             @RequestBody ZaloPayCallbackRequest request
     ) {
         try {
-            boolean valid = zaloPayService.verifyCallback(
+            if (!zaloPayService.verifyCallback(
                     request.data(),
                     request.mac()
-            );
-
-            if (!valid) {
+            )) {
                 return new ZaloPayCallbackResponse(
-                        -1,
-                        "MAC không hợp lệ"
+                        2,
+                        "Invalid"
                 );
             }
 
-            JsonNode data =
-                    objectMapper.readTree(request.data());
+            JsonNode data = objectMapper.readTree(
+                    request.data()
+            );
 
             String appTransId =
-                    data.path("apptransid").asText();
+                    data.path("app_trans_id")
+                            .asText();
 
             String zpTransId =
-                    data.path("zptransid").asText();
+                    data.path("zp_trans_id")
+                            .asText();
 
             long callbackAmount =
-                    data.path("amount").asLong();
+                    data.path("amount")
+                            .asLong(-1);
 
-            /*
-             * Vì apptransid được tạo từ:
-             * yyMMdd_orderId_random
-             */
-            Long orderId = extractOrderId(appTransId);
+            if (appTransId.isBlank()
+                    || zpTransId.isBlank()
+                    || callbackAmount <= 0) {
+
+                return new ZaloPayCallbackResponse(
+                        2,
+                        "Invalid"
+                );
+            }
+
+            Long orderId = extractOrderId(
+                    appTransId
+            );
 
             Order order = orderRepository
                     .findById(orderId)
-                    .orElseThrow(() -> new AppException(
-                            HttpStatus.NOT_FOUND,
-                            "Không tìm thấy đơn hàng"
-                    ));
+                    .orElseThrow(() ->
+                            new AppException(
+                                    HttpStatus.NOT_FOUND,
+                                    "Không tìm thấy đơn hàng"
+                            )
+                    );
 
             long expectedAmount =
-                    order.getTotalAmount().longValueExact();
+                    order.getTotalAmount()
+                            .longValueExact();
 
             if (callbackAmount != expectedAmount) {
+                log.warn(
+                        "Sai số tiền callback. Order: {}, expected: {}, actual: {}",
+                        order.getOrderCode(),
+                        expectedAmount,
+                        callbackAmount
+                );
+
                 return new ZaloPayCallbackResponse(
-                        -2,
-                        "Số tiền callback không khớp"
+                        2,
+                        "Invalid"
                 );
             }
 
@@ -84,46 +106,49 @@ public class PaymentCallbackController {
                     request.data()
             );
 
+            log.info(
+                    "ZaloPay callback thành công. Order: {}, transaction: {}",
+                    order.getOrderCode(),
+                    zpTransId
+            );
+
             return new ZaloPayCallbackResponse(
                     1,
-                    "Thanh toán thành công"
+                    "Success"
             );
-        } catch (AppException exception) {
-            return new ZaloPayCallbackResponse(
-                    0,
-                    exception.getMessage()
-            );
+
         } catch (Exception exception) {
+            log.error(
+                    "Lỗi xử lý callback ZaloPay",
+                    exception
+            );
+
             return new ZaloPayCallbackResponse(
-                    0,
-                    "Xử lý callback thất bại"
+                    2,
+                    "Invalid"
             );
         }
     }
 
-    private Long extractOrderId(String appTransId) {
-        if (appTransId == null || appTransId.isBlank()) {
-            throw new AppException(
-                    HttpStatus.BAD_REQUEST,
-                    "apptransid không hợp lệ"
-            );
-        }
-
+    private Long extractOrderId(
+            String appTransId
+    ) {
         String[] parts = appTransId.split("_");
 
         if (parts.length < 3) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
-                    "Định dạng apptransid không hợp lệ"
+                    "app_trans_id không hợp lệ"
             );
         }
 
         try {
             return Long.valueOf(parts[1]);
+
         } catch (NumberFormatException exception) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
-                    "Order ID trong apptransid không hợp lệ"
+                    "Order ID không hợp lệ"
             );
         }
     }

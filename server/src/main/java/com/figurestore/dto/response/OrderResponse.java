@@ -25,6 +25,7 @@ public record OrderResponse(
         LocalDateTime cancelledAt,
         String cancelReason,
         LocalDateTime createdAt,
-        List<OrderItemResponse> items
+        List<OrderItemResponse> items,
+        List<PaymentTransactionResponse> payments
 ) {
 }

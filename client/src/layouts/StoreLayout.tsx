@@ -300,17 +300,24 @@ export default function StoreLayout() {
                                           ? '/admin'
                                           : '/profile'
                                     }
-                                    onClick={() =>
-                                        setOpenUserMenu(
-                                            false,
-                                        )
-                                    }
+                                    onClick={() => setOpenUserMenu(false)}
                                     className="block px-4 py-2.5 text-sm hover:bg-gray-100"
                                 >
                                   {isAdmin
                                       ? 'Trang quản trị'
                                       : 'Hồ sơ cá nhân'}
                                 </Link>
+
+                                {/* Chỉ hiện với user thường */}
+                                {!isAdmin && (
+                                    <Link
+                                        to="/orders"
+                                        onClick={() => setOpenUserMenu(false)}
+                                        className="block px-4 py-2.5 text-sm hover:bg-gray-100"
+                                    >
+                                      📦 Đơn hàng của tôi
+                                    </Link>
+                                )}
 
                                 <button
                                     type="button"

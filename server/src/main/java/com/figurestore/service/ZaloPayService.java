@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.figurestore.dto.response.PaymentUrlResponse;
 import com.figurestore.dto.response.ZaloPayCreateOrderResponse;
+import com.figurestore.dto.response.ZaloPayQueryResponse;
 import com.figurestore.entity.Order;
 import com.figurestore.entity.OrderItem;
 import com.figurestore.exception.AppException;
@@ -49,40 +50,85 @@ public class ZaloPayService {
     @Value("${payment.zalopay.key2:}")
     private String key2;
 
-    @Value("${payment.zalopay.create-url}")
+    @Value("${payment.zalopay.create-url:}")
     private String createUrl;
 
-    @Value("${payment.zalopay.redirect-url}")
+    @Value("${payment.zalopay.status-url:}")
+    private String statusUrl;
+
+    @Value("${payment.zalopay.redirect-url:}")
     private String redirectUrl;
+
+    @Value("${payment.zalopay.callback-url:}")
+    private String callbackUrl;
+
+    public String generateAppTransId(Order order) {
+        if (order == null || order.getId() == null) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "Đơn hàng chưa được lưu"
+            );
+        }
+
+        String date = LocalDate
+                .now(VIETNAM_ZONE)
+                .format(TRANS_DATE_FORMAT);
+
+        String randomPart = UUID
+                .randomUUID()
+                .toString()
+                .replace("-", "")
+                .substring(0, 10);
+
+        return date
+                + "_"
+                + order.getId()
+                + "_"
+                + randomPart;
+    }
 
     public PaymentUrlResponse createPaymentUrl(
             Order order,
-            String userEmail
+            String userEmail,
+            String appTransId
     ) {
         validateConfiguration();
 
-        String appTransId = generateAppTransId(order);
+        if (appTransId == null || appTransId.isBlank()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "app_trans_id không hợp lệ"
+            );
+        }
 
         long appTime = System.currentTimeMillis();
 
-        long amount = toZaloPayAmount(order.getTotalAmount());
+        long amount = toZaloPayAmount(
+                order.getTotalAmount()
+        );
 
         String appUser =
-                userEmail == null || userEmail.isBlank()
+                userEmail == null
+                        || userEmail.isBlank()
                         ? "figure-store-user"
-                        : userEmail;
+                        : userEmail.trim();
+
+        String finalRedirectUrl =
+                redirectUrl
+                        + "?provider=ZALOPAY"
+                        + "&order="
+                        + order.getOrderCode();
 
         String embedData = toJson(
                 Map.of(
                         "redirecturl",
-                        redirectUrl
-                                + "?provider=ZALOPAY"
-                                + "&order="
-                                + order.getOrderCode()
+                        finalRedirectUrl
                 )
         );
 
-        String item = buildItemsJson(order.getItems());
+        String item = buildItemsJson(
+                order.getItems()
+        );
 
         String macInput = String.join(
                 "|",
@@ -95,24 +141,41 @@ public class ZaloPayService {
                 item
         );
 
-        String mac = hmacSha256(key1, macInput);
+        String mac = hmacSha256(
+                key1,
+                macInput
+        );
 
         MultiValueMap<String, String> form =
                 new LinkedMultiValueMap<>();
 
-        form.add("appid", appId);
-        form.add("apptransid", appTransId);
-        form.add("appuser", appUser);
-        form.add("apptime", String.valueOf(appTime));
+        form.add("app_id", appId);
+        form.add("app_trans_id", appTransId);
+        form.add("app_user", appUser);
+        form.add("app_time", String.valueOf(appTime));
         form.add("amount", String.valueOf(amount));
-        form.add("embeddata", embedData);
+        form.add("embed_data", embedData);
         form.add("item", item);
+
         form.add(
                 "description",
                 "Figure Store - Thanh toan don hang "
                         + order.getOrderCode()
         );
-        form.add("bankcode", "zalopayapp");
+
+        form.add(
+                "bank_code",
+                "zalopayapp"
+        );
+
+        if (callbackUrl != null
+                && !callbackUrl.isBlank()) {
+            form.add(
+                    "callback_url",
+                    callbackUrl
+            );
+        }
+
         form.add("mac", mac);
 
         ZaloPayCreateOrderResponse response;
@@ -127,7 +190,10 @@ public class ZaloPayService {
                     )
                     .body(form)
                     .retrieve()
-                    .body(ZaloPayCreateOrderResponse.class);
+                    .body(
+                            ZaloPayCreateOrderResponse.class
+                    );
+
         } catch (Exception exception) {
             throw new AppException(
                     HttpStatus.BAD_GATEWAY,
@@ -142,16 +208,27 @@ public class ZaloPayService {
             );
         }
 
-        if (!Integer.valueOf(1).equals(response.returnCode())) {
+        if (!Integer.valueOf(1)
+                .equals(response.returnCode())) {
+
+            String message =
+                    response.subReturnMessage() != null
+                            && !response
+                            .subReturnMessage()
+                            .isBlank()
+                            ? response.subReturnMessage()
+                            : response.returnMessage();
+
             throw new AppException(
                     HttpStatus.BAD_GATEWAY,
                     "ZaloPay từ chối tạo giao dịch: "
-                            + response.returnMessage()
+                            + message
             );
         }
 
         if (response.orderUrl() == null
                 || response.orderUrl().isBlank()) {
+
             throw new AppException(
                     HttpStatus.BAD_GATEWAY,
                     "ZaloPay không trả về đường dẫn thanh toán"
@@ -166,6 +243,82 @@ public class ZaloPayService {
         );
     }
 
+    public ZaloPayQueryResponse queryOrder(
+            String appTransId
+    ) {
+        validateConfiguration();
+
+        if (statusUrl == null
+                || statusUrl.isBlank()) {
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Chưa cấu hình ZALOPAY_STATUS_URL"
+            );
+        }
+
+        if (appTransId == null
+                || appTransId.isBlank()) {
+            throw new AppException(
+                    HttpStatus.BAD_REQUEST,
+                    "app_trans_id không hợp lệ"
+            );
+        }
+
+        String macInput =
+                appId
+                        + "|"
+                        + appTransId
+                        + "|"
+                        + key1;
+
+        String mac = hmacSha256(
+                key1,
+                macInput
+        );
+
+        MultiValueMap<String, String> form =
+                new LinkedMultiValueMap<>();
+
+        form.add("app_id", appId);
+        form.add("app_trans_id", appTransId);
+        form.add("mac", mac);
+
+        try {
+            ZaloPayQueryResponse response =
+                    RestClient
+                            .create()
+                            .post()
+                            .uri(statusUrl)
+                            .contentType(
+                                    MediaType
+                                            .APPLICATION_FORM_URLENCODED
+                            )
+                            .body(form)
+                            .retrieve()
+                            .body(
+                                    ZaloPayQueryResponse.class
+                            );
+
+            if (response == null) {
+                throw new AppException(
+                        HttpStatus.BAD_GATEWAY,
+                        "ZaloPay không trả về trạng thái giao dịch"
+                );
+            }
+
+            return response;
+
+        } catch (AppException exception) {
+            throw exception;
+
+        } catch (Exception exception) {
+            throw new AppException(
+                    HttpStatus.BAD_GATEWAY,
+                    "Không thể kiểm tra trạng thái ZaloPay"
+            );
+        }
+    }
+
     public boolean verifyCallback(
             String data,
             String requestMac
@@ -177,7 +330,10 @@ public class ZaloPayService {
             return false;
         }
 
-        String expectedMac = hmacSha256(key2, data);
+        String expectedMac = hmacSha256(
+                key2,
+                data
+        );
 
         return constantTimeEquals(
                 expectedMac,
@@ -185,35 +341,13 @@ public class ZaloPayService {
         );
     }
 
-    public String getKey2() {
-        return key2;
-    }
-
-    private String generateAppTransId(Order order) {
-        String date = LocalDate
-                .now(VIETNAM_ZONE)
-                .format(TRANS_DATE_FORMAT);
-
-        String randomPart = UUID
-                .randomUUID()
-                .toString()
-                .replace("-", "")
-                .substring(0, 10);
-
-        /*
-         * ZaloPay v1 bắt buộc apptransid bắt đầu bằng yyMMdd_.
-         * Không dùng nguyên orderCode nếu orderCode không có format này.
-         */
-        return date
-                + "_"
-                + order.getId()
-                + "_"
-                + randomPart;
-    }
-
-    private long toZaloPayAmount(BigDecimal amount) {
+    private long toZaloPayAmount(
+            BigDecimal amount
+    ) {
         if (amount == null
-                || amount.compareTo(BigDecimal.ZERO) <= 0) {
+                || amount.compareTo(
+                BigDecimal.ZERO
+        ) <= 0) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
                     "Số tiền thanh toán không hợp lệ"
@@ -222,6 +356,7 @@ public class ZaloPayService {
 
         try {
             return amount.longValueExact();
+
         } catch (ArithmeticException exception) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,
@@ -230,33 +365,44 @@ public class ZaloPayService {
         }
     }
 
-    private String buildItemsJson(List<OrderItem> orderItems) {
-        if (orderItems == null || orderItems.isEmpty()) {
+    private String buildItemsJson(
+            List<OrderItem> orderItems
+    ) {
+        if (orderItems == null
+                || orderItems.isEmpty()) {
             return "[]";
         }
 
-        List<Map<String, Object>> items = orderItems
-                .stream()
-                .map(orderItem ->
-                        Map.<String, Object>of(
-                                "itemid",
-                                orderItem.getProductId(),
-                                "itemname",
-                                orderItem.getProductName(),
-                                "itemprice",
-                                orderItem.getUnitPrice().longValue(),
-                                "itemquantity",
-                                orderItem.getQuantity()
+        List<Map<String, Object>> items =
+                orderItems
+                        .stream()
+                        .map(orderItem ->
+                                Map.<String, Object>of(
+                                        "itemid",
+                                        orderItem.getProductId(),
+
+                                        "itemname",
+                                        orderItem.getProductName(),
+
+                                        "itemprice",
+                                        orderItem
+                                                .getUnitPrice()
+                                                .longValue(),
+
+                                        "itemquantity",
+                                        orderItem.getQuantity()
+                                )
                         )
-                )
-                .toList();
+                        .toList();
 
         return toJson(items);
     }
 
     private String toJson(Object value) {
         try {
-            return objectMapper.writeValueAsString(value);
+            return objectMapper
+                    .writeValueAsString(value);
+
         } catch (JsonProcessingException exception) {
             throw new AppException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
@@ -270,11 +416,15 @@ public class ZaloPayService {
             String data
     ) {
         try {
-            Mac mac = Mac.getInstance("HmacSHA256");
+            Mac mac = Mac.getInstance(
+                    "HmacSHA256"
+            );
 
             mac.init(
                     new SecretKeySpec(
-                            secret.getBytes(StandardCharsets.UTF_8),
+                            secret.getBytes(
+                                    StandardCharsets.UTF_8
+                            ),
                             "HmacSHA256"
                     )
             );
@@ -283,9 +433,12 @@ public class ZaloPayService {
                     .of()
                     .formatHex(
                             mac.doFinal(
-                                    data.getBytes(StandardCharsets.UTF_8)
+                                    data.getBytes(
+                                            StandardCharsets.UTF_8
+                                    )
                             )
                     );
+
         } catch (Exception exception) {
             throw new IllegalStateException(
                     "Không thể tạo chữ ký ZaloPay",
@@ -298,10 +451,24 @@ public class ZaloPayService {
             String expected,
             String actual
     ) {
-        return java.security.MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8),
-                actual.getBytes(StandardCharsets.UTF_8)
-        );
+        if (expected == null
+                || actual == null) {
+            return false;
+        }
+
+        return java.security.MessageDigest
+                .isEqual(
+                        expected
+                                .toLowerCase()
+                                .getBytes(
+                                        StandardCharsets.UTF_8
+                                ),
+                        actual
+                                .toLowerCase()
+                                .getBytes(
+                                        StandardCharsets.UTF_8
+                                )
+                );
     }
 
     private void validateConfiguration() {
@@ -323,6 +490,14 @@ public class ZaloPayService {
             throw new AppException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Chưa cấu hình ZALOPAY_KEY2"
+            );
+        }
+
+        if (createUrl == null
+                || createUrl.isBlank()) {
+            throw new AppException(
+                    HttpStatus.SERVICE_UNAVAILABLE,
+                    "Chưa cấu hình ZALOPAY_CREATE_URL"
             );
         }
     }

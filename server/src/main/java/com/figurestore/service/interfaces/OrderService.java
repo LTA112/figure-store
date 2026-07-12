@@ -14,7 +14,9 @@ public interface OrderService {
             CreateOrderRequest request
     );
 
-    List<OrderResponse> mine(String email);
+    List<OrderResponse> mine(
+            String email
+    );
 
     OrderResponse detail(
             String email,
@@ -38,6 +40,11 @@ public interface OrderService {
             String email,
             Long orderId,
             String clientIp
+    );
+
+    OrderResponse verifyZaloPayPayment(
+            String email,
+            String orderCode
     );
 
     OrderResponse markPaidFromProvider(

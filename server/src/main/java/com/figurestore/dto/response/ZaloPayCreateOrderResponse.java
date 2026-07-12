@@ -4,16 +4,22 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 public record ZaloPayCreateOrderResponse(
 
-        @JsonProperty("returncode")
+        @JsonProperty("return_code")
         Integer returnCode,
 
-        @JsonProperty("returnmessage")
+        @JsonProperty("return_message")
         String returnMessage,
 
-        @JsonProperty("orderurl")
+        @JsonProperty("sub_return_code")
+        Integer subReturnCode,
+
+        @JsonProperty("sub_return_message")
+        String subReturnMessage,
+
+        @JsonProperty("order_url")
         String orderUrl,
 
-        @JsonProperty("zptranstoken")
+        @JsonProperty("zp_trans_token")
         String zpTransToken
 
 ) {

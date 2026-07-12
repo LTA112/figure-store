@@ -22,17 +22,19 @@ import ComingSoonPage from '../features/user/ComingSoonPage'
 import CartPage from '../features/cart/CartPage'
 import CheckoutPage from '../features/checkout/CheckoutPage'
 import MyOrdersPage from '../features/orders/MyOrdersPage'
+import PaymentResultPage from '../features/payment/PaymentResultPage'
 
 import AdminDashboardPage from '../features/admin/AdminDashboardPage'
 import AdminCategoryPage from '../features/admin/category/AdminCategoryPage'
 import AdminProductListPage from '../features/admin/product/AdminProductListPage'
 import AdminProductFormPage from '../features/admin/product/AdminProductFormPage'
+import AdminOrderPage from '../features/admin/orders/AdminOrderPage'
 
 export default function AppRoutes() {
     return (
         <BrowserRouter>
             <Routes>
-                {/* STORE LAYOUT: dùng chung Header và Footer */}
+                {/* USER / STORE */}
                 <Route element={<StoreLayout />}>
                     <Route
                         path="/"
@@ -82,8 +84,33 @@ export default function AppRoutes() {
                         path="/cart"
                         element={<CartPage />}
                     />
-                    <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
-                    <Route path="/orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
+
+                    <Route
+                        path="/checkout"
+                        element={
+                            <ProtectedRoute>
+                                <CheckoutPage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/orders"
+                        element={
+                            <ProtectedRoute>
+                                <MyOrdersPage />
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    <Route
+                        path="/payment/result"
+                        element={
+                            <ProtectedRoute>
+                                <PaymentResultPage />
+                            </ProtectedRoute>
+                        }
+                    />
                 </Route>
 
                 {/* ADMIN */}
@@ -128,6 +155,15 @@ export default function AppRoutes() {
                     element={
                         <AdminRoute>
                             <AdminProductFormPage />
+                        </AdminRoute>
+                    }
+                />
+
+                <Route
+                    path="/admin/orders"
+                    element={
+                        <AdminRoute>
+                            <AdminOrderPage />
                         </AdminRoute>
                     }
                 />

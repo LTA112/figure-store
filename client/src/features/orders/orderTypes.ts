@@ -4,63 +4,84 @@ export type PaymentMethod =
     | 'ZALOPAY'
     | 'MOCK'
 
+export type OrderStatus =
+    | 'PENDING_PAYMENT'
+    | 'PENDING'
+    | 'CONFIRMED'
+    | 'SHIPPING'
+    | 'DELIVERED'
+    | 'CANCELLED'
+
+export type PaymentStatus =
+    | 'UNPAID'
+    | 'PENDING'
+    | 'PAID'
+    | 'FAILED'
+    | 'REFUNDED'
+
 export interface Address {
     id: number
     label: string
     recipientName: string
     phone: string
     province: string
-
-    /**
-     * Giữ field district để tương thích
-     * dữ liệu địa chỉ cũ.
-     *
-     * Địa chỉ mới theo mô hình 2 cấp
-     * có thể để trống field này.
-     */
-    district?: string
-
+    district?: string | null
     ward: string
     detailAddress: string
     defaultAddress: boolean
 }
 
-export type CreateAddressRequest = Omit<
-    Address,
-    'id'
->
-
 export interface OrderItem {
     id: number
     productId: number
     productName: string
-    thumbnailUrl?: string
+    thumbnailUrl?: string | null
     unitPrice: number
     quantity: number
     subtotal: number
 }
 
+export interface PaymentTransaction {
+    id: number
+    provider: PaymentMethod
+    providerTransactionId?: string | null
+    requestId: string
+    amount: number
+    status: PaymentStatus
+    createdAt: string
+    updatedAt: string
+}
+
 export interface Order {
     id: number
     orderCode: string
+
     recipientName: string
     recipientPhone: string
     shippingAddress: string
-    note?: string
+    note?: string | null
+
     subtotal: number
     shippingFee: number
     totalAmount: number
-    status: string
+
+    status: OrderStatus
     paymentMethod: PaymentMethod
-    paymentStatus: string
+    paymentStatus: PaymentStatus
+
+    paidAt?: string | null
+    cancelledAt?: string | null
+    cancelReason?: string | null
     createdAt: string
+
     items: OrderItem[]
+    payments: PaymentTransaction[]
 }
 
 export interface PaymentUrlResponse {
-    paymentUrl: string
     orderCode?: string
-    provider?: string
+    paymentUrl: string
+    provider?: PaymentMethod | string
     message?: string
 }
 

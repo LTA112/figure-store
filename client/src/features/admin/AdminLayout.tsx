@@ -26,6 +26,10 @@ const menuItems = [
         to: '/admin/products',
         label: 'Sản phẩm',
     },
+    {
+        to: '/admin/orders',
+        label: 'Đơn hàng',
+    },
 ]
 
 export default function AdminLayout({

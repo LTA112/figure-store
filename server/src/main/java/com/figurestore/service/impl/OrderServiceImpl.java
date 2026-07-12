@@ -1,10 +1,13 @@
 package com.figurestore.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.figurestore.dto.request.CreateOrderRequest;
 import com.figurestore.dto.request.UpdateOrderStatusRequest;
 import com.figurestore.dto.response.OrderItemResponse;
 import com.figurestore.dto.response.OrderResponse;
+import com.figurestore.dto.response.PaymentTransactionResponse;
 import com.figurestore.dto.response.PaymentUrlResponse;
+import com.figurestore.dto.response.ZaloPayQueryResponse;
 import com.figurestore.entity.Address;
 import com.figurestore.entity.Cart;
 import com.figurestore.entity.CartItem;
@@ -66,6 +69,8 @@ public class OrderServiceImpl implements OrderService {
  private final OrderRepository orderRepository;
  private final PaymentTransactionRepository paymentTransactionRepository;
  private final ZaloPayService zaloPayService;
+ private final ObjectMapper objectMapper;
+
  @Value("${app.frontend-url:http://localhost:5173}")
  private String frontendUrl;
 
@@ -95,7 +100,10 @@ public class OrderServiceImpl implements OrderService {
           ));
 
   Address address = addressRepository
-          .findByIdAndUserEmailIgnoreCase(request.addressId(), email)
+          .findByIdAndUserEmailIgnoreCase(
+                  request.addressId(),
+                  email
+          )
           .orElseThrow(() -> new AppException(
                   HttpStatus.BAD_REQUEST,
                   "Địa chỉ không thuộc tài khoản"
@@ -108,14 +116,17 @@ public class OrderServiceImpl implements OrderService {
                   "Giỏ hàng đang trống"
           ));
 
-  if (cart.getItems() == null || cart.getItems().isEmpty()) {
+  if (cart.getItems() == null
+          || cart.getItems().isEmpty()) {
+
    throw new AppException(
            HttpStatus.BAD_REQUEST,
            "Giỏ hàng đang trống"
    );
   }
 
-  PaymentMethod paymentMethod = request.paymentMethod();
+  PaymentMethod paymentMethod =
+          request.paymentMethod();
 
   if (paymentMethod == null) {
    throw new AppException(
@@ -124,15 +135,24 @@ public class OrderServiceImpl implements OrderService {
    );
   }
 
-  boolean isCod = paymentMethod == PaymentMethod.COD;
+  boolean isCod =
+          paymentMethod == PaymentMethod.COD;
 
   Order order = Order.builder()
           .orderCode(generateOrderCode())
           .user(user)
-          .recipientName(address.getRecipientName())
-          .recipientPhone(address.getPhone())
-          .shippingAddress(buildShippingAddress(address))
-          .note(normalizeNote(request.note()))
+          .recipientName(
+                  address.getRecipientName()
+          )
+          .recipientPhone(
+                  address.getPhone()
+          )
+          .shippingAddress(
+                  buildShippingAddress(address)
+          )
+          .note(
+                  normalizeNote(request.note())
+          )
           .shippingFee(BigDecimal.ZERO)
           .paymentMethod(paymentMethod)
           .paymentStatus(
@@ -147,7 +167,8 @@ public class OrderServiceImpl implements OrderService {
           )
           .build();
 
-  BigDecimal subtotal = BigDecimal.ZERO;
+  BigDecimal subtotal =
+          BigDecimal.ZERO;
 
   List<CartItem> currentCartItems =
           new ArrayList<>(cart.getItems());
@@ -156,7 +177,9 @@ public class OrderServiceImpl implements OrderService {
    validateCartItem(cartItem);
 
    Product product = productRepository
-           .findById(cartItem.getProduct().getId())
+           .findById(
+                   cartItem.getProduct().getId()
+           )
            .orElseThrow(() -> new AppException(
                    HttpStatus.BAD_REQUEST,
                    "Sản phẩm không còn tồn tại"
@@ -167,11 +190,15 @@ public class OrderServiceImpl implements OrderService {
            cartItem.getQuantity()
    );
 
-   BigDecimal unitPrice = getEffectivePrice(product);
+   BigDecimal unitPrice =
+           getEffectivePrice(product);
 
-   BigDecimal itemSubtotal = unitPrice.multiply(
-           BigDecimal.valueOf(cartItem.getQuantity())
-   );
+   BigDecimal itemSubtotal =
+           unitPrice.multiply(
+                   BigDecimal.valueOf(
+                           cartItem.getQuantity()
+                   )
+           );
 
    int currentSoldQuantity =
            product.getSoldQuantity() == null
@@ -179,35 +206,54 @@ public class OrderServiceImpl implements OrderService {
                    : product.getSoldQuantity();
 
    product.setStockQuantity(
-           product.getStockQuantity() - cartItem.getQuantity()
+           product.getStockQuantity()
+                   - cartItem.getQuantity()
    );
 
    product.setSoldQuantity(
-           currentSoldQuantity + cartItem.getQuantity()
+           currentSoldQuantity
+                   + cartItem.getQuantity()
    );
 
-   OrderItem orderItem = OrderItem.builder()
-           .productId(product.getId())
-           .productName(product.getName())
-           .thumbnailUrl(product.getThumbnailUrl())
-           .unitPrice(unitPrice)
-           .quantity(cartItem.getQuantity())
-           .subtotal(itemSubtotal)
-           .build();
+   OrderItem orderItem =
+           OrderItem.builder()
+                   .productId(
+                           product.getId()
+                   )
+                   .productName(
+                           product.getName()
+                   )
+                   .thumbnailUrl(
+                           product.getThumbnailUrl()
+                   )
+                   .unitPrice(unitPrice)
+                   .quantity(
+                           cartItem.getQuantity()
+                   )
+                   .subtotal(itemSubtotal)
+                   .build();
 
    order.addItem(orderItem);
 
-   subtotal = subtotal.add(itemSubtotal);
+   subtotal =
+           subtotal.add(itemSubtotal);
   }
 
   order.setSubtotal(subtotal);
+
   order.setTotalAmount(
-          subtotal.add(order.getShippingFee())
+          subtotal.add(
+                  order.getShippingFee()
+          )
   );
 
-  Order savedOrder = orderRepository.save(order);
+  Order savedOrder =
+          orderRepository.save(order);
 
-  cartItemRepository.deleteAll(currentCartItems);
+  cartItemRepository.deleteAll(
+          currentCartItems
+  );
+
   cart.getItems().clear();
 
   return mapToResponse(savedOrder);
@@ -215,9 +261,13 @@ public class OrderServiceImpl implements OrderService {
 
  @Override
  @Transactional(readOnly = true)
- public List<OrderResponse> mine(String email) {
+ public List<OrderResponse> mine(
+         String email
+ ) {
   return orderRepository
-          .findAllByUserEmailIgnoreCaseOrderByCreatedAtDesc(email)
+          .findAllByUserEmailIgnoreCaseOrderByCreatedAtDesc(
+                  email
+          )
           .stream()
           .map(this::mapToResponse)
           .toList();
@@ -230,7 +280,10 @@ public class OrderServiceImpl implements OrderService {
          Long id
  ) {
   Order order = orderRepository
-          .findByIdAndUserEmailIgnoreCase(id, email)
+          .findByIdAndUserEmailIgnoreCase(
+                  id,
+                  email
+          )
           .orElseThrow(() -> new AppException(
                   HttpStatus.NOT_FOUND,
                   "Không tìm thấy đơn hàng"
@@ -247,7 +300,10 @@ public class OrderServiceImpl implements OrderService {
          String reason
  ) {
   Order order = orderRepository
-          .findByIdAndUserEmailIgnoreCase(id, email)
+          .findByIdAndUserEmailIgnoreCase(
+                  id,
+                  email
+          )
           .orElseThrow(() -> new AppException(
                   HttpStatus.NOT_FOUND,
                   "Không tìm thấy đơn hàng"
@@ -255,7 +311,8 @@ public class OrderServiceImpl implements OrderService {
 
   boolean canCancel =
           order.getStatus() == OrderStatus.PENDING
-                  || order.getStatus() == OrderStatus.PENDING_PAYMENT;
+                  || order.getStatus()
+                  == OrderStatus.PENDING_PAYMENT;
 
   if (!canCancel) {
    throw new AppException(
@@ -264,7 +321,9 @@ public class OrderServiceImpl implements OrderService {
    );
   }
 
-  if (order.getPaymentStatus() == PaymentStatus.PAID) {
+  if (order.getPaymentStatus()
+          == PaymentStatus.PAID) {
+
    throw new AppException(
            HttpStatus.CONFLICT,
            "Đơn hàng đã thanh toán, cần thực hiện hoàn tiền trước"
@@ -273,11 +332,30 @@ public class OrderServiceImpl implements OrderService {
 
   restoreProductStock(order);
 
-  order.setStatus(OrderStatus.CANCELLED);
-  order.setCancelledAt(LocalDateTime.now());
-  order.setCancelReason(reason.trim());
+  order.setStatus(
+          OrderStatus.CANCELLED
+  );
 
-  return mapToResponse(orderRepository.save(order));
+  order.setCancelledAt(
+          LocalDateTime.now()
+  );
+
+  order.setCancelReason(
+          reason == null || reason.isBlank()
+                  ? "Khách hàng hủy đơn"
+                  : reason.trim()
+  );
+
+  updateLatestPendingTransaction(
+          order,
+          null,
+          PaymentStatus.FAILED,
+          "Khách hàng hủy đơn hàng"
+  );
+
+  return mapToResponse(
+          orderRepository.save(order)
+  );
  }
 
  @Override
@@ -303,7 +381,11 @@ public class OrderServiceImpl implements OrderService {
                   "Không tìm thấy đơn hàng"
           ));
 
-  OrderStatus nextStatus = request.status();
+  OrderStatus currentStatus =
+          order.getStatus();
+
+  OrderStatus nextStatus =
+          request.status();
 
   if (nextStatus == null) {
    throw new AppException(
@@ -312,18 +394,35 @@ public class OrderServiceImpl implements OrderService {
    );
   }
 
-  if (!isValidStatusTransition(order.getStatus(), nextStatus)) {
+  if (!isValidStatusTransition(
+          currentStatus,
+          nextStatus
+  )) {
    throw new AppException(
            HttpStatus.CONFLICT,
            "Không thể chuyển trạng thái "
-                   + order.getStatus()
+                   + currentStatus
                    + " → "
                    + nextStatus
    );
   }
 
+  if (nextStatus == OrderStatus.CONFIRMED
+          && order.getPaymentMethod()
+          != PaymentMethod.COD
+          && order.getPaymentStatus()
+          != PaymentStatus.PAID) {
+
+   throw new AppException(
+           HttpStatus.CONFLICT,
+           "Đơn hàng online chưa được thanh toán"
+   );
+  }
+
   if (nextStatus == OrderStatus.CANCELLED) {
-   if (order.getPaymentStatus() == PaymentStatus.PAID) {
+   if (order.getPaymentStatus()
+           == PaymentStatus.PAID) {
+
     throw new AppException(
             HttpStatus.CONFLICT,
             "Đơn hàng đã thanh toán, cần hoàn tiền trước khi hủy"
@@ -332,14 +431,476 @@ public class OrderServiceImpl implements OrderService {
 
    restoreProductStock(order);
 
-   order.setCancelledAt(LocalDateTime.now());
-   order.setCancelReason("Admin hủy đơn");
+   order.setCancelledAt(
+           LocalDateTime.now()
+   );
+
+   order.setCancelReason(
+           "Admin hủy đơn"
+   );
+
+   updateLatestPendingTransaction(
+           order,
+           null,
+           PaymentStatus.FAILED,
+           "Admin hủy đơn"
+   );
+  }
+
+  if (nextStatus == OrderStatus.DELIVERED
+          && order.getPaymentMethod()
+          == PaymentMethod.COD) {
+
+   order.setPaymentStatus(
+           PaymentStatus.PAID
+   );
+
+   if (order.getPaidAt() == null) {
+    order.setPaidAt(
+            LocalDateTime.now()
+    );
+   }
+
+   createCodPaymentTransactionIfMissing(
+           order
+   );
   }
 
   order.setStatus(nextStatus);
 
-  return mapToResponse(orderRepository.save(order));
+  return mapToResponse(
+          orderRepository.save(order)
+  );
  }
+
+ @Override
+ @Transactional
+ public PaymentUrlResponse createPayment(
+         String email,
+         Long orderId,
+         String clientIp
+ ) {
+  Order order = orderRepository
+          .findByIdAndUserEmailIgnoreCase(
+                  orderId,
+                  email
+          )
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND,
+                  "Không tìm thấy đơn hàng"
+          ));
+
+  if (order.getStatus()
+          != OrderStatus.PENDING_PAYMENT) {
+
+   throw new AppException(
+           HttpStatus.CONFLICT,
+           "Đơn hàng không ở trạng thái chờ thanh toán"
+   );
+  }
+
+  if (order.getPaymentStatus()
+          == PaymentStatus.PAID) {
+
+   throw new AppException(
+           HttpStatus.CONFLICT,
+           "Đơn hàng đã được thanh toán"
+   );
+  }
+
+  if (order.getPaymentMethod()
+          == PaymentMethod.COD) {
+
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Đơn COD không cần tạo liên kết thanh toán"
+   );
+  }
+
+  if (order.getPaymentMethod()
+          == PaymentMethod.ZALOPAY) {
+
+   String appTransId =
+           zaloPayService.generateAppTransId(
+                   order
+           );
+
+   PaymentTransaction transaction =
+           PaymentTransaction.builder()
+                   .order(order)
+                   .provider(
+                           PaymentMethod.ZALOPAY
+                   )
+                   .requestId(appTransId)
+                   .amount(
+                           order.getTotalAmount()
+                   )
+                   .status(
+                           PaymentStatus.PENDING
+                   )
+                   .build();
+
+   paymentTransactionRepository.save(
+           transaction
+   );
+
+   return zaloPayService.createPaymentUrl(
+           order,
+           email,
+           appTransId
+   );
+  }
+
+  PaymentTransaction existingPending =
+          paymentTransactionRepository
+                  .findTopByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
+                          order.getId(),
+                          order.getPaymentMethod(),
+                          PaymentStatus.PENDING
+                  )
+                  .orElse(null);
+
+  String requestId;
+
+  if (existingPending != null) {
+   requestId =
+           existingPending.getRequestId();
+
+  } else {
+   requestId =
+           UUID.randomUUID().toString();
+
+   PaymentTransaction transaction =
+           PaymentTransaction.builder()
+                   .order(order)
+                   .provider(
+                           order.getPaymentMethod()
+                   )
+                   .requestId(requestId)
+                   .amount(
+                           order.getTotalAmount()
+                   )
+                   .status(
+                           PaymentStatus.PENDING
+                   )
+                   .build();
+
+   paymentTransactionRepository.save(
+           transaction
+   );
+  }
+
+  if (order.getPaymentMethod()
+          == PaymentMethod.MOCK) {
+
+   String paymentUrl =
+           frontendUrl
+                   + "/payment/mock?order="
+                   + encode(
+                   order.getOrderCode()
+           )
+                   + "&requestId="
+                   + encode(requestId);
+
+   return new PaymentUrlResponse(
+           order.getOrderCode(),
+           paymentUrl,
+           "MOCK",
+           "Thanh toán mô phỏng"
+   );
+  }
+
+  if (order.getPaymentMethod()
+          == PaymentMethod.VNPAY) {
+
+   return new PaymentUrlResponse(
+           order.getOrderCode(),
+           createVnpayUrl(
+                   order,
+                   clientIp
+           ),
+           "VNPAY",
+           "Chuyển đến VNPay Sandbox"
+   );
+  }
+
+  throw new AppException(
+          HttpStatus.BAD_REQUEST,
+          "Phương thức thanh toán không hợp lệ"
+  );
+ }
+
+ @Override
+ @Transactional
+ public OrderResponse verifyZaloPayPayment(
+         String email,
+         String orderCode
+ ) {
+  if (orderCode == null
+          || orderCode.isBlank()) {
+
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Mã đơn hàng không hợp lệ"
+   );
+  }
+
+  Order order = orderRepository
+          .findByOrderCode(
+                  orderCode.trim()
+          )
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND,
+                  "Không tìm thấy đơn hàng"
+          ));
+
+  if (order.getUser() == null
+          || order.getUser().getEmail() == null
+          || !order.getUser()
+          .getEmail()
+          .equalsIgnoreCase(email)) {
+
+   throw new AppException(
+           HttpStatus.FORBIDDEN,
+           "Bạn không có quyền kiểm tra đơn hàng này"
+   );
+  }
+
+  if (order.getPaymentMethod()
+          != PaymentMethod.ZALOPAY) {
+
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Đơn hàng không thanh toán bằng ZaloPay"
+   );
+  }
+
+  if (order.getPaymentStatus()
+          == PaymentStatus.PAID) {
+
+   return mapToResponse(order);
+  }
+
+  PaymentTransaction transaction =
+          paymentTransactionRepository
+                  .findTopByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
+                          order.getId(),
+                          PaymentMethod.ZALOPAY,
+                          PaymentStatus.PENDING
+                  )
+                  .orElseThrow(() -> new AppException(
+                          HttpStatus.NOT_FOUND,
+                          "Không tìm thấy giao dịch ZaloPay"
+                  ));
+
+  ZaloPayQueryResponse response =
+          zaloPayService.queryOrder(
+                  transaction.getRequestId()
+          );
+
+  transaction.setRawResponse(
+          toJsonString(response)
+  );
+
+  if (Integer.valueOf(1)
+          .equals(response.returnCode())) {
+
+   if (response.zpTransId() == null) {
+    throw new AppException(
+            HttpStatus.BAD_GATEWAY,
+            "ZaloPay không trả về mã giao dịch"
+    );
+   }
+
+   long expectedAmount =
+           order.getTotalAmount()
+                   .longValueExact();
+
+   if (response.amount() == null
+           || response.amount().longValue()
+           != expectedAmount) {
+
+    throw new AppException(
+            HttpStatus.CONFLICT,
+            "Số tiền thanh toán không khớp"
+    );
+   }
+
+   transaction.setProviderTransactionId(
+           String.valueOf(
+                   response.zpTransId()
+           )
+   );
+
+   transaction.setStatus(
+           PaymentStatus.PAID
+   );
+
+   paymentTransactionRepository.save(
+           transaction
+   );
+
+   order.setPaymentStatus(
+           PaymentStatus.PAID
+   );
+
+   order.setStatus(
+           OrderStatus.PENDING
+   );
+
+   order.setPaidAt(
+           LocalDateTime.now()
+   );
+
+   return mapToResponse(
+           orderRepository.save(order)
+   );
+  }
+
+  paymentTransactionRepository.save(
+          transaction
+  );
+
+  return mapToResponse(order);
+ }
+
+ @Override
+ @Transactional
+ public OrderResponse markPaidFromProvider(
+         String orderCode,
+         String providerTransactionId,
+         String rawResponse
+ ) {
+  if (orderCode == null
+          || orderCode.isBlank()) {
+
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Mã đơn hàng không hợp lệ"
+   );
+  }
+
+  if (providerTransactionId == null
+          || providerTransactionId.isBlank()) {
+
+   throw new AppException(
+           HttpStatus.BAD_REQUEST,
+           "Mã giao dịch không hợp lệ"
+   );
+  }
+
+  String normalizedTransactionId =
+          providerTransactionId.trim();
+
+  Order order = orderRepository
+          .findByOrderCode(
+                  orderCode.trim()
+          )
+          .orElseThrow(() -> new AppException(
+                  HttpStatus.NOT_FOUND,
+                  "Không tìm thấy đơn hàng"
+          ));
+
+  if (order.getPaymentStatus()
+          == PaymentStatus.PAID) {
+
+   return mapToResponse(order);
+  }
+
+  if (order.getStatus()
+          != OrderStatus.PENDING_PAYMENT) {
+
+   throw new AppException(
+           HttpStatus.CONFLICT,
+           "Đơn hàng không ở trạng thái chờ thanh toán"
+   );
+  }
+
+  paymentTransactionRepository
+          .findByProviderTransactionId(
+                  normalizedTransactionId
+          )
+          .ifPresent(existing -> {
+           if (!existing
+                   .getOrder()
+                   .getId()
+                   .equals(order.getId())) {
+
+            throw new AppException(
+                    HttpStatus.CONFLICT,
+                    "Mã giao dịch đã được sử dụng cho đơn hàng khác"
+            );
+           }
+          });
+
+  PaymentTransaction transaction =
+          paymentTransactionRepository
+                  .findTopByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
+                          order.getId(),
+                          order.getPaymentMethod(),
+                          PaymentStatus.PENDING
+                  )
+                  .orElse(null);
+
+  if (transaction == null) {
+   transaction =
+           paymentTransactionRepository
+                   .findByProviderTransactionId(
+                           normalizedTransactionId
+                   )
+                   .orElse(null);
+  }
+
+  if (transaction == null) {
+   transaction =
+           PaymentTransaction.builder()
+                   .order(order)
+                   .provider(
+                           order.getPaymentMethod()
+                   )
+                   .requestId(
+                           UUID.randomUUID()
+                                   .toString()
+                   )
+                   .amount(
+                           order.getTotalAmount()
+                   )
+                   .build();
+  }
+
+  transaction.setProviderTransactionId(
+          normalizedTransactionId
+  );
+
+  transaction.setStatus(
+          PaymentStatus.PAID
+  );
+
+  transaction.setRawResponse(
+          rawResponse
+  );
+
+  paymentTransactionRepository.save(
+          transaction
+  );
+
+  order.setPaymentStatus(
+          PaymentStatus.PAID
+  );
+
+  order.setStatus(
+          OrderStatus.PENDING
+  );
+
+  order.setPaidAt(
+          LocalDateTime.now()
+  );
+
+  return mapToResponse(
+          orderRepository.save(order)
+  );
+ }
+
  @Override
  @Transactional
  public OrderResponse markPaymentFailed(
@@ -355,22 +916,21 @@ public class OrderServiceImpl implements OrderService {
                   "Không tìm thấy đơn hàng"
           ));
 
-  /*
-   * Đơn đã thanh toán thành công thì không được
-   * chuyển thành thất bại hoặc hoàn tồn kho.
-   */
-  if (order.getPaymentStatus() == PaymentStatus.PAID) {
+  if (order.getPaymentStatus()
+          == PaymentStatus.PAID) {
+
    return mapToResponse(order);
   }
 
-  /*
-   * Đơn đã bị hủy trước đó thì không hoàn kho lần thứ hai.
-   */
-  if (order.getStatus() == OrderStatus.CANCELLED) {
+  if (order.getStatus()
+          == OrderStatus.CANCELLED) {
+
    return mapToResponse(order);
   }
 
-  if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+  if (order.getStatus()
+          != OrderStatus.PENDING_PAYMENT) {
+
    throw new AppException(
            HttpStatus.CONFLICT,
            "Đơn hàng không ở trạng thái chờ thanh toán"
@@ -379,18 +939,28 @@ public class OrderServiceImpl implements OrderService {
 
   restoreProductStock(order);
 
-  order.setPaymentStatus(PaymentStatus.FAILED);
-  order.setStatus(OrderStatus.CANCELLED);
-  order.setCancelledAt(LocalDateTime.now());
+  order.setPaymentStatus(
+          PaymentStatus.FAILED
+  );
+
+  order.setStatus(
+          OrderStatus.CANCELLED
+  );
+
+  order.setCancelledAt(
+          LocalDateTime.now()
+  );
+
   order.setCancelReason(
           reason == null || reason.isBlank()
                   ? "Thanh toán thất bại hoặc đã bị hủy"
                   : reason.trim()
   );
 
-  updateFailedPaymentTransaction(
+  updateLatestPendingTransaction(
           order,
           providerTransactionId,
+          PaymentStatus.FAILED,
           rawResponse
   );
 
@@ -399,211 +969,117 @@ public class OrderServiceImpl implements OrderService {
   );
  }
 
- private void updateFailedPaymentTransaction(
-         Order order,
-         String providerTransactionId,
-         String rawResponse
+ private void createCodPaymentTransactionIfMissing(
+         Order order
  ) {
-  PaymentTransaction transaction = null;
+  boolean exists =
+          paymentTransactionRepository
+                  .findAllByOrderIdOrderByCreatedAtDesc(
+                          order.getId()
+                  )
+                  .stream()
+                  .anyMatch(transaction ->
+                          transaction.getProvider()
+                                  == PaymentMethod.COD
+                                  && transaction.getStatus()
+                                  == PaymentStatus.PAID
+                  );
 
-  if (providerTransactionId != null
-          && !providerTransactionId.isBlank()) {
-   transaction = paymentTransactionRepository
-           .findByProviderTransactionId(
-                   providerTransactionId
-           )
-           .orElse(null);
+  if (exists) {
+   return;
   }
-
-  if (transaction == null) {
-   transaction = PaymentTransaction.builder()
-           .order(order)
-           .provider(order.getPaymentMethod())
-           .providerTransactionId(
-                   providerTransactionId == null
-                           || providerTransactionId.isBlank()
-                           ? null
-                           : providerTransactionId.trim()
-           )
-           .requestId(UUID.randomUUID().toString())
-           .amount(order.getTotalAmount())
-           .status(PaymentStatus.FAILED)
-           .rawResponse(rawResponse)
-           .build();
-  } else {
-   transaction.setStatus(PaymentStatus.FAILED);
-   transaction.setRawResponse(rawResponse);
-  }
-
-  paymentTransactionRepository.save(transaction);
- }
- @Override
- @Transactional
- public PaymentUrlResponse createPayment(
-         String email,
-         Long orderId,
-         String clientIp
- ) {
-  Order order = orderRepository
-          .findByIdAndUserEmailIgnoreCase(orderId, email)
-          .orElseThrow(() -> new AppException(
-                  HttpStatus.NOT_FOUND,
-                  "Không tìm thấy đơn hàng"
-          ));
-
-  if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-   throw new AppException(
-           HttpStatus.CONFLICT,
-           "Đơn hàng không ở trạng thái chờ thanh toán"
-   );
-  }
-
-  if (order.getPaymentStatus() == PaymentStatus.PAID) {
-   throw new AppException(
-           HttpStatus.CONFLICT,
-           "Đơn hàng đã được thanh toán"
-   );
-  }
-
-  if (order.getPaymentMethod() == PaymentMethod.COD) {
-   throw new AppException(
-           HttpStatus.BAD_REQUEST,
-           "Đơn COD không cần tạo liên kết thanh toán"
-   );
-  }
-
-  String requestId = UUID.randomUUID().toString();
 
   PaymentTransaction transaction =
           PaymentTransaction.builder()
                   .order(order)
-                  .provider(order.getPaymentMethod())
-                  .requestId(requestId)
-                  .amount(order.getTotalAmount())
-                  .status(PaymentStatus.PENDING)
+                  .provider(PaymentMethod.COD)
+                  .providerTransactionId(
+                          "COD-"
+                                  + order.getOrderCode()
+                  )
+                  .requestId(
+                          UUID.randomUUID()
+                                  .toString()
+                  )
+                  .amount(
+                          order.getTotalAmount()
+                  )
+                  .status(
+                          PaymentStatus.PAID
+                  )
+                  .rawResponse(
+                          "Admin xác nhận đã giao hàng và đã thu tiền COD"
+                  )
                   .build();
 
-  paymentTransactionRepository.save(transaction);
-
-  if (order.getPaymentMethod() == PaymentMethod.MOCK) {
-   String paymentUrl =
-           frontendUrl
-                   + "/payment/mock?order="
-                   + encode(order.getOrderCode())
-                   + "&requestId="
-                   + encode(requestId);
-
-   return new PaymentUrlResponse(
-           order.getOrderCode(),
-           paymentUrl,
-           "MOCK",
-           "Thanh toán mô phỏng"
-   );
-  }
-
-  if (order.getPaymentMethod() == PaymentMethod.VNPAY) {
-   return new PaymentUrlResponse(
-           order.getOrderCode(),
-           createVnpayUrl(order, clientIp),
-           "VNPAY",
-           "Chuyển đến VNPay Sandbox"
-   );
-  }
-
-  if (order.getPaymentMethod() == PaymentMethod.ZALOPAY) {
-   return zaloPayService.createPaymentUrl(
-           order,
-           email
-   );
-  }
-
-  throw new AppException(
-          HttpStatus.BAD_REQUEST,
-          "Phương thức thanh toán không hợp lệ"
+  paymentTransactionRepository.save(
+          transaction
   );
  }
 
- @Override
- @Transactional
- public OrderResponse markPaidFromProvider(
-         String orderCode,
+ private void updateLatestPendingTransaction(
+         Order order,
          String providerTransactionId,
+         PaymentStatus status,
          String rawResponse
  ) {
-  if (orderCode == null || orderCode.isBlank()) {
-   throw new AppException(
-           HttpStatus.BAD_REQUEST,
-           "Mã đơn hàng không hợp lệ"
-   );
-  }
-
-  if (providerTransactionId == null
-          || providerTransactionId.isBlank()) {
-   throw new AppException(
-           HttpStatus.BAD_REQUEST,
-           "Mã giao dịch không hợp lệ"
-   );
-  }
-
-  Order order = orderRepository
-          .findByOrderCode(orderCode)
-          .orElseThrow(() -> new AppException(
-                  HttpStatus.NOT_FOUND,
-                  "Không tìm thấy đơn hàng"
-          ));
-
-  if (order.getPaymentStatus() == PaymentStatus.PAID) {
-   return mapToResponse(order);
-  }
-
-  if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
-   throw new AppException(
-           HttpStatus.CONFLICT,
-           "Đơn hàng không ở trạng thái chờ thanh toán"
-   );
-  }
-
-  paymentTransactionRepository
-          .findByProviderTransactionId(providerTransactionId)
-          .ifPresent(existingTransaction -> {
-           if (!existingTransaction.getOrder()
-                   .getId()
-                   .equals(order.getId())) {
-            throw new AppException(
-                    HttpStatus.CONFLICT,
-                    "Mã giao dịch đã được sử dụng cho đơn hàng khác"
-            );
-           }
-          });
-
-  order.setPaymentStatus(PaymentStatus.PAID);
-  order.setStatus(OrderStatus.PENDING);
-  order.setPaidAt(LocalDateTime.now());
-
-  boolean transactionAlreadyExists =
+  PaymentTransaction transaction =
           paymentTransactionRepository
-                  .findByProviderTransactionId(providerTransactionId)
-                  .isPresent();
+                  .findTopByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
+                          order.getId(),
+                          order.getPaymentMethod(),
+                          PaymentStatus.PENDING
+                  )
+                  .orElse(null);
 
-  if (!transactionAlreadyExists) {
-   PaymentTransaction transaction =
+  if (transaction == null
+          && providerTransactionId != null
+          && !providerTransactionId.isBlank()) {
+
+   transaction =
+           paymentTransactionRepository
+                   .findByProviderTransactionId(
+                           providerTransactionId.trim()
+                   )
+                   .orElse(null);
+  }
+
+  if (transaction == null) {
+   transaction =
            PaymentTransaction.builder()
                    .order(order)
-                   .provider(order.getPaymentMethod())
-                   .providerTransactionId(providerTransactionId)
-                   .requestId(UUID.randomUUID().toString())
-                   .amount(order.getTotalAmount())
-                   .status(PaymentStatus.PAID)
-                   .rawResponse(rawResponse)
+                   .provider(
+                           order.getPaymentMethod()
+                   )
+                   .requestId(
+                           UUID.randomUUID()
+                                   .toString()
+                   )
+                   .amount(
+                           order.getTotalAmount()
+                   )
                    .build();
-
-   paymentTransactionRepository.save(transaction);
   }
 
-  return mapToResponse(orderRepository.save(order));
+  if (providerTransactionId != null
+          && !providerTransactionId.isBlank()) {
+
+   transaction.setProviderTransactionId(
+           providerTransactionId.trim()
+   );
+  }
+
+  transaction.setStatus(status);
+  transaction.setRawResponse(rawResponse);
+
+  paymentTransactionRepository.save(
+          transaction
+  );
  }
 
- private void validateCartItem(CartItem cartItem) {
+ private void validateCartItem(
+         CartItem cartItem
+ ) {
   if (cartItem.getProduct() == null) {
    throw new AppException(
            HttpStatus.BAD_REQUEST,
@@ -613,6 +1089,7 @@ public class OrderServiceImpl implements OrderService {
 
   if (cartItem.getQuantity() == null
           || cartItem.getQuantity() <= 0) {
+
    throw new AppException(
            HttpStatus.BAD_REQUEST,
            "Số lượng sản phẩm trong giỏ hàng không hợp lệ"
@@ -624,15 +1101,21 @@ public class OrderServiceImpl implements OrderService {
          Product product,
          int quantity
  ) {
-  if (product.getStatus() == ProductStatus.INACTIVE) {
+  if (product.getStatus()
+          == ProductStatus.INACTIVE) {
+
    throw new AppException(
            HttpStatus.CONFLICT,
-           "Sản phẩm '" + product.getName() + "' đã ngừng bán"
+           "Sản phẩm '"
+                   + product.getName()
+                   + "' đã ngừng bán"
    );
   }
 
   if (product.getStockQuantity() == null
-          || product.getStockQuantity() < quantity) {
+          || product.getStockQuantity()
+          < quantity) {
+
    throw new AppException(
            HttpStatus.CONFLICT,
            "Sản phẩm '"
@@ -641,9 +1124,13 @@ public class OrderServiceImpl implements OrderService {
    );
   }
 
-  BigDecimal effectivePrice = getEffectivePrice(product);
+  BigDecimal effectivePrice =
+          getEffectivePrice(product);
 
-  if (effectivePrice.compareTo(BigDecimal.ZERO) <= 0) {
+  if (effectivePrice.compareTo(
+          BigDecimal.ZERO
+  ) <= 0) {
+
    throw new AppException(
            HttpStatus.CONFLICT,
            "Giá sản phẩm '"
@@ -653,10 +1140,13 @@ public class OrderServiceImpl implements OrderService {
   }
  }
 
- private BigDecimal getEffectivePrice(Product product) {
+ private BigDecimal getEffectivePrice(
+         Product product
+ ) {
   if (product.getDiscountPrice() != null
           && product.getDiscountPrice()
           .compareTo(BigDecimal.ZERO) > 0) {
+
    return product.getDiscountPrice();
   }
 
@@ -674,30 +1164,44 @@ public class OrderServiceImpl implements OrderService {
          OrderStatus currentStatus,
          OrderStatus nextStatus
  ) {
+  if (currentStatus == nextStatus) {
+   return false;
+  }
+
   return switch (currentStatus) {
+   case PENDING_PAYMENT ->
+           nextStatus == OrderStatus.CANCELLED;
+
    case PENDING ->
            nextStatus == OrderStatus.CONFIRMED
-                   || nextStatus == OrderStatus.CANCELLED;
+                   || nextStatus
+                   == OrderStatus.CANCELLED;
 
    case CONFIRMED ->
            nextStatus == OrderStatus.SHIPPING
-                   || nextStatus == OrderStatus.CANCELLED;
+                   || nextStatus
+                   == OrderStatus.CANCELLED;
 
    case SHIPPING ->
            nextStatus == OrderStatus.DELIVERED;
 
-   default -> false;
+   case DELIVERED, CANCELLED ->
+           false;
   };
  }
 
- private void restoreProductStock(Order order) {
+ private void restoreProductStock(
+         Order order
+ ) {
   if (order.getItems() == null) {
    return;
   }
 
   for (OrderItem orderItem : order.getItems()) {
    productRepository
-           .findById(orderItem.getProductId())
+           .findById(
+                   orderItem.getProductId()
+           )
            .ifPresent(product -> {
             int currentStock =
                     product.getStockQuantity() == null
@@ -710,7 +1214,8 @@ public class OrderServiceImpl implements OrderService {
                             : product.getSoldQuantity();
 
             product.setStockQuantity(
-                    currentStock + orderItem.getQuantity()
+                    currentStock
+                            + orderItem.getQuantity()
             );
 
             product.setSoldQuantity(
@@ -732,59 +1237,111 @@ public class OrderServiceImpl implements OrderService {
           || vnpayTmnCode.isBlank()
           || vnpayHashSecret == null
           || vnpayHashSecret.isBlank()) {
+
    throw new AppException(
            HttpStatus.SERVICE_UNAVAILABLE,
            "Chưa cấu hình VNPay TMN Code hoặc Hash Secret"
    );
   }
 
-  Map<String, String> parameters = new TreeMap<>();
+  Map<String, String> parameters =
+          new TreeMap<>();
 
-  parameters.put("vnp_Version", "2.1.0");
-  parameters.put("vnp_Command", "pay");
-  parameters.put("vnp_TmnCode", vnpayTmnCode);
+  parameters.put(
+          "vnp_Version",
+          "2.1.0"
+  );
+
+  parameters.put(
+          "vnp_Command",
+          "pay"
+  );
+
+  parameters.put(
+          "vnp_TmnCode",
+          vnpayTmnCode
+  );
+
   parameters.put(
           "vnp_Amount",
           order.getTotalAmount()
-                  .multiply(BigDecimal.valueOf(100))
+                  .multiply(
+                          BigDecimal.valueOf(100)
+                  )
                   .toBigInteger()
                   .toString()
   );
-  parameters.put("vnp_CurrCode", "VND");
-  parameters.put("vnp_TxnRef", order.getOrderCode());
+
+  parameters.put(
+          "vnp_CurrCode",
+          "VND"
+  );
+
+  parameters.put(
+          "vnp_TxnRef",
+          order.getOrderCode()
+  );
+
   parameters.put(
           "vnp_OrderInfo",
-          "Thanh toan don hang " + order.getOrderCode()
+          "Thanh toan don hang "
+                  + order.getOrderCode()
   );
-  parameters.put("vnp_OrderType", "other");
-  parameters.put("vnp_Locale", "vn");
-  parameters.put("vnp_ReturnUrl", vnpayReturnUrl);
+
+  parameters.put(
+          "vnp_OrderType",
+          "other"
+  );
+
+  parameters.put(
+          "vnp_Locale",
+          "vn"
+  );
+
+  parameters.put(
+          "vnp_ReturnUrl",
+          vnpayReturnUrl
+  );
+
   parameters.put(
           "vnp_IpAddr",
           normalizeClientIp(clientIp)
   );
+
   parameters.put(
           "vnp_CreateDate",
-          LocalDateTime.now().format(VNPAY_DATE_FORMAT)
+          LocalDateTime.now()
+                  .format(
+                          VNPAY_DATE_FORMAT
+                  )
   );
 
-  String queryString = parameters
-          .entrySet()
-          .stream()
-          .map(entry ->
-                  encode(entry.getKey())
-                          + "="
-                          + encode(entry.getValue())
-          )
-          .reduce(
-                  (first, second) -> first + "&" + second
-          )
-          .orElse("");
+  String queryString =
+          parameters
+                  .entrySet()
+                  .stream()
+                  .map(entry ->
+                          encode(
+                                  entry.getKey()
+                          )
+                                  + "="
+                                  + encode(
+                                  entry.getValue()
+                          )
+                  )
+                  .reduce(
+                          (first, second) ->
+                                  first
+                                          + "&"
+                                          + second
+                  )
+                  .orElse("");
 
-  String secureHash = hmacSha512(
-          vnpayHashSecret,
-          queryString
-  );
+  String secureHash =
+          hmacSha512(
+                  vnpayHashSecret,
+                  queryString
+          );
 
   return vnpayUrl
           + "?"
@@ -795,50 +1352,85 @@ public class OrderServiceImpl implements OrderService {
 
  private String generateOrderCode() {
   String timePart =
-          LocalDateTime.now().format(ORDER_CODE_FORMAT);
+          LocalDateTime.now()
+                  .format(
+                          ORDER_CODE_FORMAT
+                  );
 
   int randomNumber =
-          ThreadLocalRandom.current().nextInt(1000);
+          ThreadLocalRandom
+                  .current()
+                  .nextInt(1000);
 
   return "FS"
           + timePart
-          + String.format("%03d", randomNumber);
- }
-
- private String buildShippingAddress(Address address) {
-  return String.join(
-          ", ",
-          address.getDetailAddress(),
-          address.getWard(),
-          address.getDistrict(),
-          address.getProvince()
+          + String.format(
+          "%03d",
+          randomNumber
   );
  }
 
- private String normalizeNote(String note) {
-  if (note == null || note.isBlank()) {
+ private String buildShippingAddress(
+         Address address
+ ) {
+  return java.util.stream.Stream.of(
+                  address.getDetailAddress(),
+                  address.getWard(),
+                  address.getDistrict(),
+                  address.getProvince()
+          )
+          .filter(value ->
+                  value != null
+                          && !value.isBlank()
+          )
+          .collect(
+                  java.util.stream.Collectors
+                          .joining(", ")
+          );
+ }
+
+ private String normalizeNote(
+         String note
+ ) {
+  if (note == null
+          || note.isBlank()) {
+
    return null;
   }
 
   return note.trim();
  }
 
- private String normalizeClientIp(String clientIp) {
-  if (clientIp == null || clientIp.isBlank()) {
+ private String normalizeClientIp(
+         String clientIp
+ ) {
+  if (clientIp == null
+          || clientIp.isBlank()) {
+
    return "127.0.0.1";
   }
 
   if (clientIp.contains(",")) {
-   return clientIp.split(",")[0].trim();
+   return clientIp
+           .split(",")[0]
+           .trim();
   }
 
   return clientIp.trim();
  }
 
- private String encode(String value) {
+ private String encode(
+         String value
+ ) {
   return URLEncoder
-          .encode(value, StandardCharsets.US_ASCII)
-          .replace("+", "%20");
+          .encode(
+                  value,
+                  StandardCharsets.US_ASCII
+          )
+          .replace(
+                  "+",
+                  "%20"
+          );
  }
 
  private String hmacSha512(
@@ -846,11 +1438,16 @@ public class OrderServiceImpl implements OrderService {
          String data
  ) {
   try {
-   Mac mac = Mac.getInstance("HmacSHA512");
+   Mac mac =
+           Mac.getInstance(
+                   "HmacSHA512"
+           );
 
    SecretKeySpec secretKeySpec =
            new SecretKeySpec(
-                   secretKey.getBytes(StandardCharsets.UTF_8),
+                   secretKey.getBytes(
+                           StandardCharsets.UTF_8
+                   ),
                    "HmacSHA512"
            );
 
@@ -858,10 +1455,15 @@ public class OrderServiceImpl implements OrderService {
 
    byte[] hash =
            mac.doFinal(
-                   data.getBytes(StandardCharsets.UTF_8)
+                   data.getBytes(
+                           StandardCharsets.UTF_8
+                   )
            );
 
-   return HexFormat.of().formatHex(hash);
+   return HexFormat
+           .of()
+           .formatHex(hash);
+
   } catch (Exception exception) {
    throw new IllegalStateException(
            "Không thể tạo chữ ký VNPay",
@@ -870,7 +1472,21 @@ public class OrderServiceImpl implements OrderService {
   }
  }
 
- private OrderResponse mapToResponse(Order order) {
+ private String toJsonString(
+         Object value
+ ) {
+  try {
+   return objectMapper
+           .writeValueAsString(value);
+
+  } catch (Exception exception) {
+   return String.valueOf(value);
+  }
+ }
+
+ private OrderResponse mapToResponse(
+         Order order
+ ) {
   List<OrderItemResponse> items =
           order.getItems() == null
                   ? List.of()
@@ -885,6 +1501,26 @@ public class OrderServiceImpl implements OrderService {
                                   item.getUnitPrice(),
                                   item.getQuantity(),
                                   item.getSubtotal()
+                          )
+                  )
+                  .toList();
+
+  List<PaymentTransactionResponse> payments =
+          paymentTransactionRepository
+                  .findAllByOrderIdOrderByCreatedAtDesc(
+                          order.getId()
+                  )
+                  .stream()
+                  .map(transaction ->
+                          new PaymentTransactionResponse(
+                                  transaction.getId(),
+                                  transaction.getProvider(),
+                                  transaction.getProviderTransactionId(),
+                                  transaction.getRequestId(),
+                                  transaction.getAmount(),
+                                  transaction.getStatus(),
+                                  transaction.getCreatedAt(),
+                                  transaction.getUpdatedAt()
                           )
                   )
                   .toList();
@@ -906,7 +1542,8 @@ public class OrderServiceImpl implements OrderService {
           order.getCancelledAt(),
           order.getCancelReason(),
           order.getCreatedAt(),
-          items
+          items,
+          payments
   );
  }
 }
