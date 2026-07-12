@@ -1,6 +1,7 @@
 package com.figurestore.controller;
 
 import com.figurestore.dto.request.AddCartItemRequest;
+import com.figurestore.dto.request.MergeCartRequest;
 import com.figurestore.dto.request.UpdateCartItemRequest;
 import com.figurestore.dto.response.ApiResponse;
 import com.figurestore.dto.response.CartResponse;
@@ -10,7 +11,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/cart")
@@ -20,9 +28,8 @@ public class CartController {
     private final CartService cartService;
 
     @GetMapping
-    public ResponseEntity<
-            ApiResponse<CartResponse>
-            > getCart(
+    public ResponseEntity<ApiResponse<CartResponse>>
+    getCart(
             Authentication authentication
     ) {
         CartResponse result =
@@ -39,9 +46,8 @@ public class CartController {
     }
 
     @PostMapping("/items")
-    public ResponseEntity<
-            ApiResponse<CartResponse>
-            > addItem(
+    public ResponseEntity<ApiResponse<CartResponse>>
+    addItem(
             Authentication authentication,
             @Valid
             @RequestBody
@@ -63,10 +69,35 @@ public class CartController {
                 );
     }
 
+    /*
+     * Đồng bộ giỏ hàng guest trong localStorage
+     * vào giỏ hàng của tài khoản sau khi đăng nhập.
+     */
+    @PostMapping("/merge")
+    public ResponseEntity<ApiResponse<CartResponse>>
+    mergeCart(
+            Authentication authentication,
+            @Valid
+            @RequestBody
+            MergeCartRequest request
+    ) {
+        CartResponse result =
+                cartService.mergeCart(
+                        authentication.getName(),
+                        request
+                );
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Đồng bộ giỏ hàng thành công",
+                        result
+                )
+        );
+    }
+
     @PutMapping("/items/{itemId}")
-    public ResponseEntity<
-            ApiResponse<CartResponse>
-            > updateItem(
+    public ResponseEntity<ApiResponse<CartResponse>>
+    updateItem(
             Authentication authentication,
             @PathVariable Long itemId,
             @Valid
@@ -89,9 +120,8 @@ public class CartController {
     }
 
     @DeleteMapping("/items/{itemId}")
-    public ResponseEntity<
-            ApiResponse<CartResponse>
-            > removeItem(
+    public ResponseEntity<ApiResponse<CartResponse>>
+    removeItem(
             Authentication authentication,
             @PathVariable Long itemId
     ) {
@@ -110,9 +140,8 @@ public class CartController {
     }
 
     @DeleteMapping
-    public ResponseEntity<
-            ApiResponse<Void>
-            > clearCart(
+    public ResponseEntity<ApiResponse<Void>>
+    clearCart(
             Authentication authentication
     ) {
         cartService.clearCart(

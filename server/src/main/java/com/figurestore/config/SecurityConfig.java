@@ -17,7 +17,9 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.*;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
 
@@ -40,7 +42,9 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
 
                 .cors(cors ->
-                        cors.configurationSource(corsConfigurationSource())
+                        cors.configurationSource(
+                                corsConfigurationSource()
+                        )
                 )
 
                 .sessionManagement(session ->
@@ -55,9 +59,11 @@ public class SecurityConfig {
                                     response.setStatus(
                                             HttpServletResponse.SC_UNAUTHORIZED
                                     );
+
                                     response.setContentType(
                                             "application/json;charset=UTF-8"
                                     );
+
                                     response.getWriter().write(
                                             """
                                             {
@@ -69,14 +75,17 @@ public class SecurityConfig {
                                     );
                                 }
                         )
+
                         .accessDeniedHandler(
                                 (request, response, accessDeniedException) -> {
                                     response.setStatus(
                                             HttpServletResponse.SC_FORBIDDEN
                                     );
+
                                     response.setContentType(
                                             "application/json;charset=UTF-8"
                                     );
+
                                     response.getWriter().write(
                                             """
                                             {
@@ -90,33 +99,39 @@ public class SecurityConfig {
                         )
                 )
 
-                .authenticationProvider(authenticationProvider())
+                .authenticationProvider(
+                        authenticationProvider()
+                )
 
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/register").permitAll()
-                        .requestMatchers("/api/auth/login").permitAll()
-
                         .requestMatchers(
-                                HttpMethod.GET,
-                                "/api/products/**"
+                                "/api/auth/register",
+                                "/api/auth/login",
+                                "/api/payments/vnpay/return",
+                                "/api/payments/zalopay/callback"
                         ).permitAll()
 
                         .requestMatchers(
                                 HttpMethod.GET,
+                                "/api/products/**",
                                 "/api/categories/**"
                         ).permitAll()
 
                         .requestMatchers("/api/admin/**")
                         .hasRole("ADMIN")
 
-                        .requestMatchers("/api/user/**")
-                        .hasRole("USER")
+                        .requestMatchers(
+                                "/api/user/**",
+                                "/api/cart/**",
+                                "/api/addresses/**",
+                                "/api/orders/**"
+                        ).hasRole("USER")
 
                         .requestMatchers("/api/auth/me")
                         .authenticated()
-                        .requestMatchers("/api/cart/**")
-                        .hasRole("USER")
-                        .anyRequest().authenticated()
+
+                        .anyRequest()
+                        .authenticated()
                 )
 
                 .addFilterBefore(
@@ -151,24 +166,31 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+        CorsConfiguration configuration =
+                new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of(allowedOrigin));
+        configuration.setAllowedOrigins(
+                List.of(allowedOrigin)
+        );
 
-        configuration.setAllowedMethods(List.of(
-                "GET",
-                "POST",
-                "PUT",
-                "PATCH",
-                "DELETE",
-                "OPTIONS"
-        ));
+        configuration.setAllowedMethods(
+                List.of(
+                        "GET",
+                        "POST",
+                        "PUT",
+                        "PATCH",
+                        "DELETE",
+                        "OPTIONS"
+                )
+        );
 
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(
+                List.of("*")
+        );
 
-        configuration.setExposedHeaders(List.of(
-                "Authorization"
-        ));
+        configuration.setExposedHeaders(
+                List.of("Authorization")
+        );
 
         configuration.setAllowCredentials(true);
 

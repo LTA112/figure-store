@@ -1,4 +1,5 @@
 import { api } from '../../services/api'
+
 import type {
     AddCartItemRequest,
     Cart,
@@ -6,9 +7,34 @@ import type {
     UpdateCartItemRequest,
 } from './cartTypes'
 
-export async function getCartApi(): Promise<Cart> {
+export interface MergeCartItemRequest {
+    productId: number
+    quantity: number
+}
+
+interface MergeCartRequest {
+    items: MergeCartItemRequest[]
+}
+
+function notifyServerCartUpdated(
+    cart?: Cart,
+): void {
+    window.dispatchEvent(
+        new CustomEvent(
+            'server-cart-updated',
+            {
+                detail: cart,
+            },
+        ),
+    )
+}
+
+export async function getCartApi():
+    Promise<Cart> {
     const response =
-        await api.get<CartApiResponse>('/cart')
+        await api.get<CartApiResponse>(
+            '/cart',
+        )
 
     return response.data.data
 }
@@ -22,7 +48,31 @@ export async function addCartItemApi(
             request,
         )
 
-    return response.data.data
+    const cart = response.data.data
+
+    notifyServerCartUpdated(cart)
+
+    return cart
+}
+
+export async function mergeGuestCartApi(
+    items: MergeCartItemRequest[],
+): Promise<Cart> {
+    const request: MergeCartRequest = {
+        items,
+    }
+
+    const response =
+        await api.post<CartApiResponse>(
+            '/cart/merge',
+            request,
+        )
+
+    const cart = response.data.data
+
+    notifyServerCartUpdated(cart)
+
+    return cart
 }
 
 export async function updateCartItemApi(
@@ -35,7 +85,11 @@ export async function updateCartItemApi(
             request,
         )
 
-    return response.data.data
+    const cart = response.data.data
+
+    notifyServerCartUpdated(cart)
+
+    return cart
 }
 
 export async function removeCartItemApi(
@@ -46,9 +100,22 @@ export async function removeCartItemApi(
             `/cart/items/${itemId}`,
         )
 
-    return response.data.data
+    const cart = response.data.data
+
+    notifyServerCartUpdated(cart)
+
+    return cart
 }
 
-export async function clearCartApi(): Promise<void> {
+export async function clearCartApi():
+    Promise<void> {
     await api.delete('/cart')
+
+    notifyServerCartUpdated({
+        id: null,
+        items: [],
+        totalItems: 0,
+        totalQuantity: 0,
+        totalAmount: 0,
+    })
 }

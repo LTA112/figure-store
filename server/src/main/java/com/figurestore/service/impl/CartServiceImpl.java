@@ -1,6 +1,7 @@
 package com.figurestore.service.impl;
 
 import com.figurestore.dto.request.AddCartItemRequest;
+import com.figurestore.dto.request.MergeCartRequest;
 import com.figurestore.dto.request.UpdateCartItemRequest;
 import com.figurestore.dto.response.CartResponse;
 import com.figurestore.entity.Cart;
@@ -77,59 +78,59 @@ public class CartServiceImpl
         Cart cart =
                 getOrCreateCart(user);
 
-        CartItem existingItem =
-                cartItemRepository
-                        .findByCartIdAndProductId(
-                                cart.getId(),
-                                product.getId()
-                        )
-                        .orElse(null);
+        addOrIncreaseCartItem(
+                cart,
+                product,
+                requestedQuantity
+        );
 
-        if (existingItem != null) {
-            int newQuantity =
-                    existingItem.getQuantity()
-                            + requestedQuantity;
+        return getUpdatedCartResponse(
+                cart.getId()
+        );
+    }
+
+    /*
+     * Nhận các sản phẩm đang lưu trong localStorage
+     * của guest và thêm vào giỏ hàng của user.
+     */
+    @Override
+    @Transactional
+    public CartResponse mergeCart(
+            String email,
+            MergeCartRequest request
+    ) {
+        User user =
+                findUser(email);
+
+        Cart cart =
+                getOrCreateCart(user);
+
+        for (
+                AddCartItemRequest guestItem
+                : request.getItems()
+        ) {
+            Product product =
+                    findPurchasableProduct(
+                            guestItem.getProductId()
+                    );
+
+            Integer guestQuantity =
+                    guestItem.getQuantity();
 
             validateStock(
                     product,
-                    newQuantity
+                    guestQuantity
             );
 
-            existingItem.setQuantity(
-                    newQuantity
+            addOrIncreaseCartItem(
+                    cart,
+                    product,
+                    guestQuantity
             );
-
-            cartItemRepository.save(
-                    existingItem
-            );
-        } else {
-            CartItem item =
-                    CartItem.builder()
-                            .cart(cart)
-                            .product(product)
-                            .quantity(
-                                    requestedQuantity
-                            )
-                            .build();
-
-            cart.addItem(item);
-
-            cartItemRepository.save(item);
         }
 
-        Cart updatedCart =
-                cartRepository.findById(
-                                cart.getId()
-                        )
-                        .orElseThrow(() ->
-                                new AppException(
-                                        HttpStatus.NOT_FOUND,
-                                        "Không tìm thấy giỏ hàng"
-                                )
-                        );
-
-        return CartResponse.fromEntity(
-                updatedCart
+        return getUpdatedCartResponse(
+                cart.getId()
         );
     }
 
@@ -169,8 +170,8 @@ public class CartServiceImpl
 
         cartItemRepository.save(item);
 
-        return CartResponse.fromEntity(
-                item.getCart()
+        return getUpdatedCartResponse(
+                item.getCart().getId()
         );
     }
 
@@ -200,8 +201,10 @@ public class CartServiceImpl
 
         cartItemRepository.delete(item);
 
-        return CartResponse.fromEntity(
-                cart
+        cartItemRepository.flush();
+
+        return getUpdatedCartResponse(
+                cart.getId()
         );
     }
 
@@ -226,6 +229,83 @@ public class CartServiceImpl
         cartRepository.save(cart);
     }
 
+    /*
+     * Thêm sản phẩm mới hoặc cộng số lượng
+     * nếu sản phẩm đã có trong giỏ.
+     */
+    private void addOrIncreaseCartItem(
+            Cart cart,
+            Product product,
+            Integer quantity
+    ) {
+        CartItem existingItem =
+                cartItemRepository
+                        .findByCartIdAndProductId(
+                                cart.getId(),
+                                product.getId()
+                        )
+                        .orElse(null);
+
+        if (existingItem != null) {
+            int newQuantity =
+                    existingItem.getQuantity()
+                            + quantity;
+
+            validateStock(
+                    product,
+                    newQuantity
+            );
+
+            existingItem.setQuantity(
+                    newQuantity
+            );
+
+            cartItemRepository.save(
+                    existingItem
+            );
+
+            return;
+        }
+
+        validateStock(
+                product,
+                quantity
+        );
+
+        CartItem newItem =
+                CartItem.builder()
+                        .cart(cart)
+                        .product(product)
+                        .quantity(quantity)
+                        .build();
+
+        cart.addItem(newItem);
+
+        cartItemRepository.save(
+                newItem
+        );
+    }
+
+    private CartResponse getUpdatedCartResponse(
+            Long cartId
+    ) {
+        cartItemRepository.flush();
+
+        Cart updatedCart =
+                cartRepository
+                        .findById(cartId)
+                        .orElseThrow(() ->
+                                new AppException(
+                                        HttpStatus.NOT_FOUND,
+                                        "Không tìm thấy giỏ hàng"
+                                )
+                        );
+
+        return CartResponse.fromEntity(
+                updatedCart
+        );
+    }
+
     private User findUser(
             String email
     ) {
@@ -245,7 +325,9 @@ public class CartServiceImpl
             User user
     ) {
         return cartRepository
-                .findByUserId(user.getId())
+                .findByUserId(
+                        user.getId()
+                )
                 .orElseGet(() ->
                         cartRepository.save(
                                 Cart.builder()
@@ -289,8 +371,10 @@ public class CartServiceImpl
         if (
                 product.getStatus()
                         == ProductStatus.OUT_OF_STOCK
-                        || product.getStockQuantity() == null
-                        || product.getStockQuantity() <= 0
+                        || product.getStockQuantity()
+                        == null
+                        || product.getStockQuantity()
+                        <= 0
         ) {
             throw new AppException(
                     HttpStatus.BAD_REQUEST,

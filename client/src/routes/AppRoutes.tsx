@@ -20,6 +20,8 @@ import UserProfilePage from '../features/user/UserProfilePage'
 import ComingSoonPage from '../features/user/ComingSoonPage'
 
 import CartPage from '../features/cart/CartPage'
+import CheckoutPage from '../features/checkout/CheckoutPage'
+import MyOrdersPage from '../features/orders/MyOrdersPage'
 
 import AdminDashboardPage from '../features/admin/AdminDashboardPage'
 import AdminCategoryPage from '../features/admin/category/AdminCategoryPage'
@@ -80,6 +82,8 @@ export default function AppRoutes() {
                         path="/cart"
                         element={<CartPage />}
                     />
+                    <Route path="/checkout" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+                    <Route path="/orders" element={<ProtectedRoute><MyOrdersPage /></ProtectedRoute>} />
                 </Route>
 
                 {/* ADMIN */}

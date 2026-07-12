@@ -2,11 +2,21 @@ import type {
     GuestCartItem,
 } from './cartTypes'
 
+import {
+    mergeGuestCartApi,
+} from './cartAPI'
+
+import type {
+    Cart,
+} from './cartTypes'
+
 const GUEST_CART_KEY = 'guestCart'
 
 function notifyCartUpdated(): void {
     window.dispatchEvent(
-        new Event('guest-cart-updated'),
+        new Event(
+            'guest-cart-updated',
+        ),
     )
 }
 
@@ -23,7 +33,9 @@ export function getGuestCart():
         }
 
         const parsedCart =
-            JSON.parse(storedCart) as unknown
+            JSON.parse(
+                storedCart,
+            ) as unknown
 
         if (!Array.isArray(parsedCart)) {
             return []
@@ -34,7 +46,8 @@ export function getGuestCart():
                 item,
             ): item is GuestCartItem => {
                 if (
-                    typeof item !== 'object' ||
+                    typeof item !==
+                    'object' ||
                     item === null
                 ) {
                     return false
@@ -49,7 +62,9 @@ export function getGuestCart():
                     typeof candidate.productName ===
                     'string' &&
                     typeof candidate.quantity ===
-                    'number'
+                    'number' &&
+                    candidate.productId > 0 &&
+                    candidate.quantity > 0
                 )
             },
         )
@@ -74,42 +89,47 @@ export function addGuestCartItem(
 ): GuestCartItem[] {
     const cart = getGuestCart()
 
-    const existingItem = cart.find(
-        (cartItem) =>
-            cartItem.productId ===
-            item.productId,
-    )
-
-    if (existingItem) {
-        const newQuantity = Math.min(
-            existingItem.quantity +
-            item.quantity,
-            item.stockQuantity,
-        )
-
-        const updatedCart = cart.map(
+    const existingItem =
+        cart.find(
             (cartItem) =>
                 cartItem.productId ===
-                item.productId
-                    ? {
-                        ...cartItem,
-                        quantity:
-                        newQuantity,
-                        stockQuantity:
-                        item.stockQuantity,
-                        sellingPrice:
-                        item.sellingPrice,
-                        originalPrice:
-                        item.originalPrice,
-                        thumbnailUrl:
-                        item.thumbnailUrl,
-                        productStatus:
-                        item.productStatus,
-                    }
-                    : cartItem,
+                item.productId,
         )
 
-        saveGuestCart(updatedCart)
+    if (existingItem) {
+        const newQuantity =
+            Math.min(
+                existingItem.quantity +
+                item.quantity,
+                item.stockQuantity,
+            )
+
+        const updatedCart =
+            cart.map(
+                (cartItem) =>
+                    cartItem.productId ===
+                    item.productId
+                        ? {
+                            ...cartItem,
+                            quantity:
+                            newQuantity,
+                            stockQuantity:
+                            item.stockQuantity,
+                            sellingPrice:
+                            item.sellingPrice,
+                            originalPrice:
+                            item.originalPrice,
+                            thumbnailUrl:
+                            item.thumbnailUrl,
+                            productStatus:
+                            item.productStatus,
+                        }
+                        : cartItem,
+            )
+
+        saveGuestCart(
+            updatedCart,
+        )
 
         return updatedCart
     }
@@ -136,10 +156,11 @@ export function updateGuestCartItem(
 ): GuestCartItem[] {
     const cart = getGuestCart()
 
-    const updatedCart = cart.map(
-        (item) => {
+    const updatedCart =
+        cart.map((item) => {
             if (
-                item.productId !== productId
+                item.productId !==
+                productId
             ) {
                 return item
             }
@@ -154,8 +175,7 @@ export function updateGuestCartItem(
                     ),
                 ),
             }
-        },
-    )
+        })
 
     saveGuestCart(updatedCart)
 
@@ -168,7 +188,8 @@ export function removeGuestCartItem(
     const updatedCart =
         getGuestCart().filter(
             (item) =>
-                item.productId !== productId,
+                item.productId !==
+                productId,
         )
 
     saveGuestCart(updatedCart)
@@ -191,4 +212,43 @@ export function getGuestCartCount():
             total + item.quantity,
         0,
     )
+}
+
+/*
+ * Đồng bộ toàn bộ giỏ guest chỉ bằng
+ * một request POST /cart/merge.
+ */
+export async function syncGuestCartToServer():
+    Promise<Cart | null> {
+    const guestItems =
+        getGuestCart()
+
+    if (
+        guestItems.length === 0
+    ) {
+        return null
+    }
+
+    const mergeItems =
+        guestItems.map(
+            (item) => ({
+                productId:
+                item.productId,
+                quantity:
+                item.quantity,
+            }),
+        )
+
+    /*
+     * Chỉ xóa localStorage nếu API
+     * merge chạy thành công.
+     */
+    const mergedCart =
+        await mergeGuestCartApi(
+            mergeItems,
+        )
+
+    clearGuestCart()
+
+    return mergedCart
 }
