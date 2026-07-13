@@ -322,7 +322,7 @@ export default function HomePage() {
               </p>
 
               <h1 className="mt-4 text-5xl font-black tracking-tight text-slate-950 md:text-6xl lg:text-7xl">
-                The Sticky
+                The Sticky Rice
               </h1>
 
               <p className="mx-auto mt-5 max-w-xl text-sm leading-7 text-gray-700 md:mx-0 md:text-base">
