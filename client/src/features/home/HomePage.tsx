@@ -228,21 +228,6 @@ export default function HomePage() {
     }
   }, [activeHeroSlide, heroSlides.length])
 
-  const goToPreviousHeroSlide = () => {
-    setActiveHeroSlide(
-      (currentSlide) =>
-        (currentSlide - 1 + heroSlides.length) %
-        heroSlides.length,
-    )
-  }
-
-  const goToNextHeroSlide = () => {
-    setActiveHeroSlide(
-      (currentSlide) =>
-        (currentSlide + 1) % heroSlides.length,
-    )
-  }
-
   useEffect(() => {
     if (!activeCollectionId) {
       setCollectionProducts([])
