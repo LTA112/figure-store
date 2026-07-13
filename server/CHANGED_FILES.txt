@@ -1,0 +1,9 @@
+Backend changes:
+- src/main/java/com/figurestore/entity/Order.java
+  Added confirmed_at, shipping_at, delivered_at.
+- src/main/java/com/figurestore/dto/response/OrderResponse.java
+  Returns the new timestamps.
+- src/main/java/com/figurestore/service/impl/OrderServiceImpl.java
+  Saves timestamps when admin confirms, starts shipping, or marks delivered.
+
+DDL_AUTO=update will add the new columns automatically after redeploy/restart.

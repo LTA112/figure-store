@@ -153,6 +153,15 @@ public class Order {
  @Column(name = "paid_at")
  private LocalDateTime paidAt;
 
+ @Column(name = "confirmed_at")
+ private LocalDateTime confirmedAt;
+
+ @Column(name = "shipping_at")
+ private LocalDateTime shippingAt;
+
+ @Column(name = "delivered_at")
+ private LocalDateTime deliveredAt;
+
  @Column(name = "cancelled_at")
  private LocalDateTime cancelledAt;
 

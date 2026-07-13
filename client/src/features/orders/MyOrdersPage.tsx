@@ -79,6 +79,16 @@ function formatDate(value?: string | null): string {
     return new Date(value).toLocaleString('vi-VN')
 }
 
+function formatEstimatedDelivery(createdAt: string): string {
+    const start = new Date(createdAt)
+    const end = new Date(createdAt)
+
+    start.setDate(start.getDate() + 3)
+    end.setDate(end.getDate() + 7)
+
+    return `${start.toLocaleDateString('vi-VN')} - ${end.toLocaleDateString('vi-VN')}`
+}
+
 function getStepIndex(status: OrderStatus): number {
     if (status === 'PENDING_PAYMENT') {
         return 0
@@ -334,6 +344,50 @@ export default function MyOrdersPage() {
                                                         {order.paidAt
                                                             ? formatDate(order.paidAt)
                                                             : 'Chưa thanh toán'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                                            <p className="text-sm font-bold text-slate-900">
+                                                Mốc thời gian đơn hàng
+                                            </p>
+
+                                            <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                                                <div>
+                                                    <p className="text-slate-400">Ngày đặt</p>
+                                                    <p className="mt-1 font-semibold text-slate-800">
+                                                        {formatDate(order.createdAt)}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-slate-400">Xác nhận</p>
+                                                    <p className="mt-1 font-semibold text-slate-800">
+                                                        {order.confirmedAt
+                                                            ? formatDate(order.confirmedAt)
+                                                            : 'Chưa xác nhận'}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-slate-400">Bắt đầu giao</p>
+                                                    <p className="mt-1 font-semibold text-slate-800">
+                                                        {order.shippingAt
+                                                            ? formatDate(order.shippingAt)
+                                                            : 'Chưa giao'}
+                                                    </p>
+                                                </div>
+
+                                                <div>
+                                                    <p className="text-slate-400">Giao thành công</p>
+                                                    <p className="mt-1 font-semibold text-slate-800">
+                                                        {order.deliveredAt
+                                                            ? formatDate(order.deliveredAt)
+                                                            : order.status === 'CANCELLED'
+                                                                ? 'Đơn đã hủy'
+                                                                : `Dự kiến ${formatEstimatedDelivery(order.createdAt)}`}
                                                     </p>
                                                 </div>
                                             </div>

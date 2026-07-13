@@ -447,6 +447,23 @@ public class OrderServiceImpl implements OrderService {
    );
   }
 
+  LocalDateTime statusChangedAt = LocalDateTime.now();
+
+  if (nextStatus == OrderStatus.CONFIRMED
+          && order.getConfirmedAt() == null) {
+   order.setConfirmedAt(statusChangedAt);
+  }
+
+  if (nextStatus == OrderStatus.SHIPPING
+          && order.getShippingAt() == null) {
+   order.setShippingAt(statusChangedAt);
+  }
+
+  if (nextStatus == OrderStatus.DELIVERED
+          && order.getDeliveredAt() == null) {
+   order.setDeliveredAt(statusChangedAt);
+  }
+
   if (nextStatus == OrderStatus.DELIVERED
           && order.getPaymentMethod()
           == PaymentMethod.COD) {
@@ -1539,6 +1556,9 @@ public class OrderServiceImpl implements OrderService {
           order.getPaymentMethod(),
           order.getPaymentStatus(),
           order.getPaidAt(),
+          order.getConfirmedAt(),
+          order.getShippingAt(),
+          order.getDeliveredAt(),
           order.getCancelledAt(),
           order.getCancelReason(),
           order.getCreatedAt(),

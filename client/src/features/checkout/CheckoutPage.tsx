@@ -10,6 +10,7 @@ import {
     createOrder,
     createPaymentUrl,
     getAddresses,
+    updateAddress,
 } from '../orders/orderAPI'
 
 import type {
@@ -117,6 +118,9 @@ export default function CheckoutPage() {
 
     const [showAddressForm, setShowAddressForm] =
         useState(false)
+
+    const [editingAddressId, setEditingAddressId] =
+        useState<number | null>(null)
 
     const [provinces, setProvinces] = useState<
         VietnamProvince[]
@@ -239,6 +243,7 @@ export default function CheckoutPage() {
     }
 
     function resetAddressForm() {
+        setEditingAddressId(null)
         setForm({
             ...EMPTY_ADDRESS_FORM,
             defaultAddress:
@@ -247,6 +252,32 @@ export default function CheckoutPage() {
 
         setSelectedProvinceCode('')
         setAddressError('')
+    }
+
+    function handleEditAddress(address: Address) {
+        const matchedProvince = provinces.find(
+            (province) =>
+                province.name.trim().toLowerCase() ===
+                address.province.trim().toLowerCase(),
+        )
+
+        setEditingAddressId(address.id)
+        setSelectedAddressId(address.id)
+        setSelectedProvinceCode(
+            matchedProvince ? String(matchedProvince.code) : '',
+        )
+        setForm({
+            label: address.label,
+            recipientName: address.recipientName,
+            phone: address.phone,
+            province: address.province,
+            district: address.district ?? '',
+            ward: address.ward,
+            detailAddress: address.detailAddress,
+            defaultAddress: address.defaultAddress,
+        })
+        setAddressError('')
+        setShowAddressForm(true)
     }
 
     async function handleAddAddress() {
@@ -263,43 +294,41 @@ export default function CheckoutPage() {
         setSavingAddress(true)
 
         try {
-            const createdAddress =
-                await createAddress({
-                    ...form,
-                    recipientName:
-                        form.recipientName.trim(),
-                    phone: form.phone
-                        .replace(/\s/g, '')
-                        .trim(),
-                    province: form.province.trim(),
-                    district: '',
-                    ward: form.ward.trim(),
-                    detailAddress:
-                        form.detailAddress.trim(),
-                    label:
-                        form.label.trim() || 'Nhà',
-                })
+            const payload = {
+                ...form,
+                recipientName: form.recipientName.trim(),
+                phone: form.phone.replace(/\s/g, '').trim(),
+                province: form.province.trim(),
+                district: form.district.trim(),
+                ward: form.ward.trim(),
+                detailAddress: form.detailAddress.trim(),
+                label: form.label.trim() || 'Nhà',
+            }
+
+            const savedAddress = editingAddressId
+                ? await updateAddress(editingAddressId, payload)
+                : await createAddress(payload)
 
             setAddresses((currentAddresses) => {
-                const normalizedAddresses =
-                    form.defaultAddress
-                        ? currentAddresses.map(
-                            (address) => ({
-                                ...address,
-                                defaultAddress: false,
-                            }),
-                        )
-                        : currentAddresses
+                const normalizedAddresses = form.defaultAddress
+                    ? currentAddresses.map((address) => ({
+                        ...address,
+                        defaultAddress: false,
+                    }))
+                    : currentAddresses
 
-                return [
-                    createdAddress,
-                    ...normalizedAddresses,
-                ]
+                if (editingAddressId) {
+                    return normalizedAddresses.map((address) =>
+                        address.id === savedAddress.id
+                            ? savedAddress
+                            : address,
+                    )
+                }
+
+                return [savedAddress, ...normalizedAddresses]
             })
 
-            setSelectedAddressId(
-                createdAddress.id,
-            )
+            setSelectedAddressId(savedAddress.id)
 
             setShowAddressForm(false)
             resetAddressForm()
@@ -418,6 +447,9 @@ export default function CheckoutPage() {
                                             (current) => !current,
                                         )
                                         setAddressError('')
+                                        if (!showAddressForm) {
+                                            resetAddressForm()
+                                        }
                                     }}
                                     className="rounded-xl border border-[#3157d5] px-4 py-2 text-sm font-semibold text-[#3157d5] transition hover:bg-blue-50"
                                 >
@@ -504,6 +536,18 @@ export default function CheckoutPage() {
                                                             <span className="mt-2 inline-block rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
                                 {address.label}
                               </span>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.preventDefault()
+                                                                    event.stopPropagation()
+                                                                    handleEditAddress(address)
+                                                                }}
+                                                                className="ml-3 text-xs font-bold text-[#3157d5] hover:underline"
+                                                            >
+                                                                Chỉnh sửa
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </label>
@@ -527,7 +571,7 @@ export default function CheckoutPage() {
                                 <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-6">
                                     <div className="mb-5">
                                         <h3 className="font-bold text-slate-900">
-                                            Thêm địa chỉ mới
+                                            {editingAddressId ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ mới'}
                                         </h3>
 
                                         <p className="mt-1 text-sm text-slate-500">
@@ -779,7 +823,9 @@ export default function CheckoutPage() {
                                         >
                                             {savingAddress
                                                 ? 'Đang lưu...'
-                                                : 'Lưu địa chỉ'}
+                                                : editingAddressId
+                                                    ? 'Cập nhật địa chỉ'
+                                                    : 'Lưu địa chỉ'}
                                         </button>
                                     </div>
                                 </div>

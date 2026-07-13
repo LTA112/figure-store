@@ -15,6 +15,8 @@ import { getGuestCartCount } from '../features/cart/guestCart'
 
 import type { Cart } from '../features/cart/cartTypes'
 
+import vitoyLogo from '../assets/vitoy-logo.png'
+
 const socialLinks = {
   facebook: 'https://www.facebook.com/',
   instagram: 'https://www.instagram.com/',
@@ -199,9 +201,14 @@ export default function StoreLayout() {
               <div className="flex min-h-[72px] items-center justify-between gap-4 px-5 lg:px-14">
                 <Link
                     to="/"
-                    className="rounded-full bg-[#3157d5] px-5 py-1.5 text-lg font-bold italic text-white transition hover:bg-[#2848b9]"
+                    aria-label="Vitoy - Trang chủ"
+                    className="flex shrink-0 items-center transition hover:opacity-90"
                 >
-                  Vitoy
+                  <img
+                      src={vitoyLogo}
+                      alt="Vitoy"
+                      className="h-10 w-auto object-contain sm:h-11"
+                  />
                 </Link>
 
                 <form
@@ -368,13 +375,6 @@ export default function StoreLayout() {
                 </NavLink>
 
                 <NavLink
-                    to="/products?keyword=nhân%20vật"
-                    className={navClass}
-                >
-                  Nhân vật
-                </NavLink>
-
-                <NavLink
                     to="/products?keyword=blind%20box"
                     className={navClass}
                 >
@@ -389,7 +389,7 @@ export default function StoreLayout() {
                 </NavLink>
 
                 <Link
-                    to="/#creators"
+                    to="/#vitoy-world"
                     className="whitespace-nowrap transition hover:text-[#3157d5]"
                 >
                   Thế giới Vitoy
@@ -405,9 +405,17 @@ export default function StoreLayout() {
           <footer className="bg-[#2848b9] px-6 py-12 text-white lg:px-14">
             <div className="mx-auto grid max-w-7xl gap-10 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <div className="inline-flex rounded-full bg-white px-5 py-1.5 text-lg font-bold italic text-[#3157d5]">
-                  Vitoy
-                </div>
+                <Link
+                    to="/"
+                    aria-label="Vitoy - Trang chủ"
+                    className="inline-flex rounded-2xl bg-white p-2 transition hover:opacity-90"
+                >
+                  <img
+                      src={vitoyLogo}
+                      alt="Vitoy"
+                      className="h-10 w-auto object-contain"
+                  />
+                </Link>
 
                 <p className="mt-5 text-sm leading-7 text-blue-100">
                   Art toy và mô hình sưu
@@ -436,12 +444,6 @@ export default function StoreLayout() {
                     Blind Box
                   </Link>
 
-                  <Link
-                      to="/products?keyword=nhân%20vật"
-                      className="block hover:text-white"
-                  >
-                    Nhân vật
-                  </Link>
                 </div>
               </div>
 

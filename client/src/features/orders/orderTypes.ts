@@ -81,6 +81,9 @@ export interface Order {
     paymentStatus: PaymentStatus
 
     paidAt?: string | null
+    confirmedAt?: string | null
+    shippingAt?: string | null
+    deliveredAt?: string | null
     cancelledAt?: string | null
     cancelReason?: string | null
     createdAt: string

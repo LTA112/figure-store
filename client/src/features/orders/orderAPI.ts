@@ -29,6 +29,20 @@ export const createAddress = async (
     return response.data.data
 }
 
+
+export const updateAddress = async (
+    id: number,
+    body: CreateAddressRequest,
+): Promise<Address> => {
+    const response =
+        await api.put<ApiResponse<Address>>(
+            `/addresses/${id}`,
+            body,
+        )
+
+    return response.data.data
+}
+
 export const createOrder = async (
     addressId: number,
     paymentMethod: PaymentMethod,
