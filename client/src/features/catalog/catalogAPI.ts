@@ -243,3 +243,9 @@ export async function hideProduct(
 ): Promise<void> {
     await api.delete(`/admin/products/${id}`)
 }
+
+export async function deleteProductPermanently(
+    id: number,
+): Promise<void> {
+    await api.delete(`/admin/products/${id}/permanent`)
+}

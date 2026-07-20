@@ -144,6 +144,20 @@ public class AdminProductController {
         );
     }
 
+    @DeleteMapping("/{id}/permanent")
+    public ResponseEntity<ApiResponse<Void>> deletePermanently(
+            @PathVariable Long id
+    ) {
+        productService.deletePermanently(id);
+
+        return ResponseEntity.ok(
+                ApiResponse.success(
+                        "Xóa sản phẩm vĩnh viễn thành công",
+                        null
+                )
+        );
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> hide(
             @PathVariable Long id

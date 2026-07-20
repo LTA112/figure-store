@@ -7,9 +7,12 @@ import {
 import { Link } from 'react-router-dom'
 
 import heroStickyCharacters from '../../assets/hero-slide-sticky.png'
+import heroDaLon from '../../assets/hero-slide-da-lon.jpg'
+import heroLaDua from '../../assets/hero-slide-la-dua.jpg'
 
 import {
   getCategories,
+  getProductById,
   getProducts,
 } from '../catalog/catalogAPI'
 import type {
@@ -72,11 +75,23 @@ interface HeroSlide {
   alt: string
 }
 
-const brandHeroSlide: HeroSlide = {
-  id: 'vitoy-brand',
-  image: heroStickyCharacters,
-  alt: 'Bộ sưu tập art toy Vitoy',
-}
+const heroSlides: HeroSlide[] = [
+  {
+    id: 'sticky-rice-full-set',
+    image: heroStickyCharacters,
+    alt: 'Full bộ mô hình The Sticky Rice',
+  },
+  {
+    id: 'be-da-lon',
+    image: heroDaLon,
+    alt: 'Mô hình Bé Da Lợn',
+  },
+  {
+    id: 'be-la-dua',
+    image: heroLaDua,
+    alt: 'Mô hình Bé Lá Dừa',
+  },
+]
 
 const creators = [
   {
@@ -115,8 +130,6 @@ export default function HomePage() {
   const [blindBoxProduct, setBlindBoxProduct] =
       useState<Product | undefined>()
 
-  const [featuredProducts, setFeaturedProducts] =
-      useState<Product[]>([])
 
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -133,17 +146,7 @@ export default function HomePage() {
       [collections, activeCollectionId],
   )
 
-  const heroSlides = useMemo<HeroSlide[]>(() => {
-    const productSlides = featuredProducts
-        .filter((product) => Boolean(product.thumbnailUrl))
-        .map((product) => ({
-          id: `product-${product.id}`,
-          image: product.thumbnailUrl ?? '',
-          alt: product.name,
-        }))
 
-    return [brandHeroSlide, ...productSlides]
-  }, [featuredProducts])
 
   const safeActiveHeroSlide =
       activeHeroSlide % heroSlides.length
@@ -154,26 +157,9 @@ export default function HomePage() {
         setLoading(true)
         setLoadError('')
 
-        const [
-          categoryList,
-          blindBoxResponse,
-          featuredResponse,
-        ] = await Promise.all([
+        const [categoryList, blindBox] = await Promise.all([
           getCategories(),
-          getProducts({
-            keyword: 'blind box',
-            status: 'ACTIVE',
-            sort: 'newest',
-            page: 0,
-            size: 1,
-          }),
-          getProducts({
-            featured: true,
-            status: 'ACTIVE',
-            sort: 'newest',
-            page: 0,
-            size: 4,
-          }),
+          getProductById(8),
         ])
 
         const activeCategories = categoryList.filter(
@@ -181,8 +167,7 @@ export default function HomePage() {
         )
 
         setCollections(activeCategories)
-        setBlindBoxProduct(blindBoxResponse.content[0])
-        setFeaturedProducts(featuredResponse.content)
+        setBlindBoxProduct(blindBox)
 
         const stickyCategory = activeCategories.find(
             (category) =>
@@ -514,7 +499,7 @@ export default function HomePage() {
                             <div className="relative h-[300px] overflow-hidden bg-gradient-to-b from-[#fbf9f3] to-[#eee9df] sm:h-[320px]">
                               <ProductImage
                                   product={product}
-                                  className="h-full w-full scale-[1.7] object-contain object-center transition duration-500 group-hover:scale-[1.8]"
+                                  className="h-full w-full object-contain object-center p-5 transition duration-500 group-hover:scale-[1.04]"
                               />
 
                               <div className="absolute left-4 top-4 z-10 flex gap-2">
@@ -630,7 +615,7 @@ export default function HomePage() {
             <div className="flex items-end justify-center px-6 pt-5">
               <ProductImage
                   product={blindBoxProduct}
-                  className="h-[290px] w-full max-w-[280px] object-contain drop-shadow-xl"
+                  className="h-[290px] w-full max-w-[320px] object-contain object-center p-4 drop-shadow-xl"
               />
             </div>
           </div>

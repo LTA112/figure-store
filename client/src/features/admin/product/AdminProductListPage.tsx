@@ -9,6 +9,7 @@ import axios from 'axios'
 import AdminLayout from '../AdminLayout'
 import {
     getAdminCategories,
+    deleteProductPermanently,
     getAdminProducts,
     hideProduct,
 } from '../../catalog/catalogAPI'
@@ -179,6 +180,31 @@ export default function AdminProductListPage() {
             setError(
                 getErrorMessage(requestError),
             )
+        }
+    }
+
+
+    const handleDeletePermanently = async (
+        product: Product,
+    ) => {
+        const confirmed = window.confirm(
+            `Xóa vĩnh viễn sản phẩm "${product.name}"?\n\nSản phẩm sẽ bị xóa khỏi cơ sở dữ liệu và ảnh Cloudinary. Lịch sử đơn hàng cũ vẫn giữ tên, giá và ảnh tại thời điểm mua.`,
+        )
+
+        if (!confirmed) {
+            return
+        }
+
+        try {
+            setError('')
+            setSuccess('')
+
+            await deleteProductPermanently(product.id)
+
+            setSuccess('Xóa sản phẩm vĩnh viễn thành công')
+            await loadProducts()
+        } catch (requestError) {
+            setError(getErrorMessage(requestError))
         }
     }
 
@@ -450,15 +476,23 @@ export default function AdminProductListPage() {
                                                         <button
                                                             type="button"
                                                             onClick={() =>
-                                                                handleHide(
-                                                                    product,
-                                                                )
+                                                                handleHide(product)
                                                             }
-                                                            className="rounded-lg bg-red-100 px-3 py-2 text-sm font-semibold text-red-700"
+                                                            className="rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700"
                                                         >
                                                             Ẩn
                                                         </button>
                                                     )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleDeletePermanently(product)
+                                                    }
+                                                    className="rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                                                >
+                                                    Xóa
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>

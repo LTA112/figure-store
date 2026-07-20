@@ -53,4 +53,6 @@ public interface ProductService {
     );
 
     void hide(Long id);
+
+    void deletePermanently(Long id);
 }

@@ -19,4 +19,6 @@ public interface CartItemRepository
             Long itemId,
             String email
     );
+
+    void deleteAllByProductId(Long productId);
 }

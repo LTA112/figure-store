@@ -8,6 +8,7 @@ import com.figurestore.entity.Product;
 import com.figurestore.entity.ProductImage;
 import com.figurestore.enums.ProductStatus;
 import com.figurestore.exception.AppException;
+import com.figurestore.repository.CartItemRepository;
 import com.figurestore.repository.CategoryRepository;
 import com.figurestore.repository.ProductRepository;
 import com.figurestore.service.interfaces.CloudinaryService;
@@ -39,6 +40,8 @@ public class ProductServiceImpl
     private final ProductRepository productRepository;
 
     private final CategoryRepository categoryRepository;
+
+    private final CartItemRepository cartItemRepository;
 
     private final CloudinaryService cloudinaryService;
 
@@ -455,6 +458,34 @@ public class ProductServiceImpl
         product.setStatus(ProductStatus.INACTIVE);
 
         productRepository.save(product);
+    }
+
+
+    @Override
+    @Transactional
+    public void deletePermanently(Long id) {
+        Product product = findProduct(id);
+
+        // OrderItem chỉ lưu bản chụp productId/name/price nên lịch sử đơn hàng
+        // vẫn được giữ. Chỉ cần loại sản phẩm khỏi các giỏ hiện tại.
+        cartItemRepository.deleteAllByProductId(id);
+
+        List<String> imagePublicIds = product.getImages()
+                .stream()
+                .map(ProductImage::getPublicId)
+                .filter(publicId -> publicId != null && !publicId.isBlank())
+                .toList();
+
+        String thumbnailPublicId = product.getThumbnailPublicId();
+
+        productRepository.delete(product);
+        productRepository.flush();
+
+        if (thumbnailPublicId != null && !thumbnailPublicId.isBlank()) {
+            cloudinaryService.deleteImage(thumbnailPublicId);
+        }
+
+        imagePublicIds.forEach(cloudinaryService::deleteImage);
     }
 
     private void uploadDetailImages(
